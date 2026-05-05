@@ -54,6 +54,9 @@ function App() {
     }
   }
 
+  // Check if fire is detected
+  const isFireDetected = sensorData?.flameSensor === 'DETECTED'
+
   const renderPage = () => {
     switch (currentPage) {
       case 'overview':
@@ -63,10 +66,11 @@ function App() {
             device={deviceInfo}
             health={systemHealth}
             recentEvents={events}
+            isFireDetected={isFireDetected}
           />
         )
       case 'live-monitor':
-        return <LiveMonitor current={sensorData} />
+        return <LiveMonitor current={sensorData} isFireDetected={isFireDetected} />
       case 'history':
         return <History current={sensorData} />
       case 'event-log':
@@ -76,7 +80,7 @@ function App() {
           <Settings settings={settings} onSettingChange={handleSettingChange} />
         )
       default:
-        return <Overview current={sensorData} device={deviceInfo} health={systemHealth} recentEvents={events} />
+        return <Overview current={sensorData} device={deviceInfo} health={systemHealth} recentEvents={events} isFireDetected={isFireDetected} />
     }
   }
 

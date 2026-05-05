@@ -1,5 +1,6 @@
 import React from 'react'
-import { Flame, Droplets, Activity } from 'lucide-react'
+import { Flame, Droplets, Activity, AlertTriangle } from 'lucide-react'
+import clsx from 'clsx'
 import {
   LineChart,
   Line,
@@ -18,6 +19,7 @@ interface OverviewProps {
   device: any
   health: any
   recentEvents: any[]
+  isFireDetected?: boolean
 }
 
 export const Overview: React.FC<OverviewProps> = ({
@@ -25,6 +27,7 @@ export const Overview: React.FC<OverviewProps> = ({
   device,
   health,
   recentEvents,
+  isFireDetected = false,
 }) => {
   if (!current) {
     return (
@@ -52,7 +55,23 @@ export const Overview: React.FC<OverviewProps> = ({
   ]
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={clsx('p-6 space-y-6', isFireDetected && 'bg-gradient-to-br from-red-950/30 to-slate-950')}>
+      {/* Fire Alert Banner */}
+      {isFireDetected && (
+        <div className="bg-gradient-to-r from-red-600 to-red-700 border-2 border-red-400 rounded-lg p-6 animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <AlertTriangle size={32} className="text-white animate-bounce" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white mb-1">🚨 PERINGATAN API TERDETEKSI 🚨</h2>
+              <p className="text-red-100">Sistem penyiram otomatis sedang beraksi. Area bahaya! Jangan mendekati sistem secara langsung.</p>
+            </div>
+            <Flame size={32} className="text-yellow-200 animate-bounce hidden sm:block" />
+          </div>
+        </div>
+      )}
+
       {/* Page Title */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Overview</h1>
@@ -63,16 +82,16 @@ export const Overview: React.FC<OverviewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Current Status"
-          value={current.flameSensor === 'DETECTED' ? '🔥 FIRE!' : 'NORMAL'}
+          value={isFireDetected ? '🔥 WASPADA' : 'AMAN'}
           icon={<Activity size={24} />}
-          status={current.flameSensor === 'DETECTED' ? 'critical' : 'normal'}
+          status={isFireDetected ? 'danger' : 'normal'}
         />
         <StatCard
           title="Temperature"
           value={current.temperature.toFixed(1)}
           unit="°C"
           icon={<Activity size={24} />}
-          status="normal"
+          status={current.temperature > 35 ? 'danger' : current.temperature > 30 ? 'warning' : 'normal'}
         />
         <StatCard
           title="Pump State"
@@ -85,6 +104,7 @@ export const Overview: React.FC<OverviewProps> = ({
           value={current.waterLevel.toFixed(1)}
           unit="cm"
           icon={<Droplets size={24} />}
+          status={current.waterLevel < 10 ? 'warning' : 'normal'}
         />
       </div>
 

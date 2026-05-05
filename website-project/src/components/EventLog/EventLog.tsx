@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { Flame, AlertCircle, Zap, Clock, Search, Download } from 'lucide-react'
 import clsx from 'clsx'
 import { FirebaseEvent } from '../../types'
+import { DateRangePicker } from '../DateRangePicker/DateRangePicker'
+import { exportEventsToCSV, filterEventsByDateRange } from '../../utils/csvExport'
 
 interface EventLogProps {
   events: FirebaseEvent[]
@@ -10,6 +12,7 @@ interface EventLogProps {
 export const EventLog: React.FC<EventLogProps> = ({ events }) => {
   const [filter, setFilter] = useState('All')
   const [searchTerm, setSearchTerm] = useState('')
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false)
 
   const eventTypes = ['All', 'FIRE_DETECTED', 'WATER_LEVEL_LOW', 'PUMP_ACTIVATED', 'PUMP_DEACTIVATED']
 
@@ -48,8 +51,21 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
     return matchesFilter && matchesSearch
   })
 
+  const handleExportCSV = (startDate: Date, endDate: Date) => {
+    const dateFilteredEvents = filterEventsByDateRange(filteredEvents, startDate, endDate)
+    const filename = `events_${startDate.toLocaleDateString('id-ID')}_to_${endDate.toLocaleDateString('id-ID')}.csv`
+    exportEventsToCSV(dateFilteredEvents, filename)
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {/* Date Range Picker Modal */}
+      <DateRangePicker
+        isOpen={showDateRangePicker}
+        onClose={() => setShowDateRangePicker(false)}
+        onConfirm={handleExportCSV}
+      />
+
       {/* Page Title */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Event Log</h1>
@@ -71,7 +87,10 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
         </div>
 
         {/* Export */}
-        <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors">
+        <button
+          onClick={() => setShowDateRangePicker(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 border border-green-500 rounded-lg text-white hover:bg-green-700 transition-colors font-medium"
+        >
           <Download size={16} />
           Export CSV
         </button>

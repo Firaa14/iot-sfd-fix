@@ -4,11 +4,9 @@ import {
   ref,
   onValue,
   set,
-  update,
   query,
   orderByChild,
   limitToLast,
-  DatabaseReference,
   Unsubscribe,
 } from 'firebase/database'
 import { SensorReading, FirebaseEvent, SystemSettings } from '../types'

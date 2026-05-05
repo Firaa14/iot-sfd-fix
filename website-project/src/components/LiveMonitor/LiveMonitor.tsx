@@ -1,13 +1,15 @@
 import React from 'react'
-import { Thermometer, Droplets, Flame } from 'lucide-react'
+import { Thermometer, Droplets, Flame, Activity, AlertTriangle } from 'lucide-react'
+import clsx from 'clsx'
 import { SensorReading } from '../../types'
 import { StatCard, StatusBadge } from '../Shared/Cards'
 
 interface LiveMonitorProps {
   current: SensorReading | null
+  isFireDetected?: boolean
 }
 
-export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current }) => {
+export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetected = false }) => {
   if (!current) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -17,18 +19,44 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current }) => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={clsx('p-6 space-y-6', isFireDetected && 'bg-gradient-to-br from-red-950/30 to-slate-950')}>
+      {/* Fire Alert Banner */}
+      {isFireDetected && (
+        <div className="bg-gradient-to-r from-red-600 to-red-700 border-2 border-red-400 rounded-lg p-6 animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <AlertTriangle size={32} className="text-white animate-bounce" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white mb-1">🚨 API TERDETEKSI - STATUS WASPADA 🚨</h2>
+              <p className="text-red-100">Sistem sprinkler otomatis sedang merespons. Jangan dekati area berbahaya!</p>
+            </div>
+            <Flame size={32} className="text-yellow-200 animate-bounce hidden sm:block" />
+          </div>
+        </div>
+      )}
+
       {/* Page Title */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Live Monitor</h1>
-        <p className="text-slate-400">Real-time sensor readings</p>
+        <p className="text-slate-400">Real-time sensor readings & system status</p>
       </div>
 
-      {/* Zone Info */}
-      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-        <div className="text-right">
-          <p className="text-slate-400 text-sm">ZONE</p>
-          <p className="text-2xl font-bold text-white">Warehouse A</p>
+      {/* Zone Info & System Status */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={clsx('border rounded-lg p-6', isFireDetected ? 'bg-red-600/20 border-red-500' : 'bg-slate-800/50 border-slate-700')}>
+          <p className="text-slate-400 text-sm mb-2">MONITORING ZONE</p>
+          <p className="text-3xl font-bold text-white mb-4">Warehouse A</p>
+          <div className="flex items-center gap-2">
+            <div className={clsx('w-3 h-3 rounded-full animate-pulse', isFireDetected ? 'bg-red-500' : 'bg-green-500')} />
+            <span className={isFireDetected ? 'text-red-400' : 'text-green-400'}>{isFireDetected ? 'WASPADA - API TERDETEKSI' : 'AMAN - NORMAL'}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+          <p className="text-slate-400 text-sm mb-2">LAST UPDATE</p>
+          <p className="text-2xl font-bold text-white mb-2">{new Date(current.timestamp).toLocaleTimeString()}</p>
+          <p className="text-slate-400 text-xs">Update frekuensi: Real-time (Firebase Listener)</p>
         </div>
       </div>
 
@@ -59,7 +87,7 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current }) => {
           title="Flame Sensor"
           value={current.flameSensor}
           icon={<Flame size={24} />}
-          status={current.flameSensor === 'DETECTED' ? 'danger' : 'normal'}
+          status={isFireDetected ? 'danger' : 'normal'}
         />
       </div>
 
@@ -203,7 +231,5 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current }) => {
     </div>
   )
 }
-
-import { Activity } from 'lucide-react'
 
 export default LiveMonitor
