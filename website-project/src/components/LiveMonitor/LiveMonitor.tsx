@@ -14,7 +14,8 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
   const getWaterLevelStatus = () => {
     if (!current || !settings) return null
 
-    const threshold = settings.automation.waterLevelThreshold
+    // Perbaikan: Ambil nilai 'max' dari property 'normal'
+    const threshold = settings.automation.waterLevelThreshold.normal.max
 
     // Normal: 2cm to threshold
     if (current.waterLevel >= 2 && current.waterLevel <= threshold) return 'normal'
@@ -215,15 +216,15 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
               <StatusBadge
                 status={
                   !settings ? 'NORMAL' :
-                  current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold ? 'NORMAL' :
-                  current.waterLevel > settings.automation.waterLevelThreshold && current.waterLevel <= settings.automation.waterLevelThreshold + 2 ? 'WARNING' :
-                  current.waterLevel > settings.automation.waterLevelThreshold + 2 ? 'CRITICAL' : 'UNKNOWN'
+                  current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold.normal.max ? 'NORMAL' :
+                  current.waterLevel > settings.automation.waterLevelThreshold.normal.max && current.waterLevel <= settings.automation.waterLevelThreshold.normal.max + 2 ? 'WARNING' :
+                  current.waterLevel > settings.automation.waterLevelThreshold.normal.max + 2 ? 'CRITICAL' : 'UNKNOWN'
                 }
                 label={
                   !settings ? 'Loading...' :
-                  current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold ? `Normal (2-${settings.automation.waterLevelThreshold}cm)` :
-                  current.waterLevel > settings.automation.waterLevelThreshold && current.waterLevel <= settings.automation.waterLevelThreshold + 2 ? `Alert (${(settings.automation.waterLevelThreshold + 0.1).toFixed(1)}-${(settings.automation.waterLevelThreshold + 2).toFixed(1)}cm)` :
-                  current.waterLevel > settings.automation.waterLevelThreshold + 2 ? `Empty (>${(settings.automation.waterLevelThreshold + 2).toFixed(1)}cm)` : 'Unknown'
+                  current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold.normal.max ? `Normal (2-${settings.automation.waterLevelThreshold.normal.max}cm)` :
+                  current.waterLevel > settings.automation.waterLevelThreshold.normal.max && current.waterLevel <= settings.automation.waterLevelThreshold.normal.max + 2 ? `Alert (${(settings.automation.waterLevelThreshold.normal.max + 0.1).toFixed(1)}-${(settings.automation.waterLevelThreshold.normal.max + 2).toFixed(1)}cm)` :
+                  current.waterLevel > settings.automation.waterLevelThreshold.normal.max + 2 ? `Empty (>${(settings.automation.waterLevelThreshold.normal.max + 2).toFixed(1)}cm)` : 'Unknown'
                 }
               />
             </div>
