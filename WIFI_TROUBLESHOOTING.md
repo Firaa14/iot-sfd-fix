@@ -1,50 +1,50 @@
 # WiFi Connection Troubleshooting Guide 🔌
 
-Jika serial monitor menampilkan titik-titik terus (......), berarti ESP32 gagal connect ke WiFi.
+If the serial monitor shows continuous dots (......), it means the ESP32 failed to connect to WiFi.
 
 ---
 
-## 🎯 Solusi Cepat (Step by Step)
+## 🎯 Quick Solutions (Step by Step)
 
-### Step 1: Gunakan Kode Testing Khusus
+### Step 1: Use Special Testing Code
 
-Saya sudah buat file test khusus untuk debug WiFi.
+I've created a special test file for WiFi debugging.
 
-**Copy file ini:**
+**Copy this file:**
 
 ```
 hardware-firebase/TEST_WIFI_ONLY.cpp
 ```
 
-**Cara pakai:**
+**How to use:**
 
-1. Buka Arduino IDE
+1. Open Arduino IDE
 2. File → New
-3. Copy/Paste isi `TEST_WIFI_ONLY.cpp`
-4. Update SSID dan PASSWORD (baris 10-11)
-5. Upload ke ESP32
-6. Buka Serial Monitor (Baud: 115200)
+3. Copy/Paste contents of `TEST_WIFI_ONLY.cpp`
+4. Update SSID and PASSWORD (lines 10-11)
+5. Upload to ESP32
+6. Open Serial Monitor (Baud: 115200)
 
-**Output yang diharapkan:**
+**Expected output:**
 
 ```
 ✅ Network scan
 ✅ SSID found status
-✅ Connection attempts dengan count
-✅ Error codes jika gagal
-✅ Detailed connection info jika sukses
+✅ Connection attempts with count
+✅ Error codes if failed
+✅ Detailed connection info if successful
 ```
 
 ---
 
-## 🔧 Arduino IDE Settings (WAJIB)
+## 🔧 Arduino IDE Settings (REQUIRED)
 
-Pastikan setting ini 100% benar:
+Make sure these settings are 100% correct:
 
 ### Tools → Board
 
 ```
-Select: "ESP32 Dev Module"  (bukan yang lain!)
+Select: "ESP32 Dev Module"  (not others!)
 ```
 
 ### Tools → Upload Speed
@@ -56,7 +56,7 @@ Select: 115200
 ### Tools → CPU Frequency
 
 ```
-Select: 80 MHz (atau 160 MHz)
+Select: 80 MHz (or 160 MHz)
 ```
 
 ### Tools → Flash Size
@@ -74,76 +74,76 @@ Select: "Default 4MB with spiffs"
 ### Tools → Core Debug Level
 
 ```
-Select: "Info" atau "Debug"
+Select: "Info" or "Debug"
 ```
 
 ### Port Selection
 
 ```
-COM3, COM4, COM5, dll.
-(Lihat device manager jika tidak tahu)
+COM3, COM4, COM5, etc.
+(Check device manager if unsure)
 ```
 
 ---
 
 ## 🔍 Serial Monitor Settings
 
-**SANGAT PENTING!**
+**VERY IMPORTANT!**
 
 ```
-Baud Rate: 115200 (WAJIB!)
+Baud Rate: 115200 (REQUIRED!)
 Line Ending: "Both NL and CR" (recommended)
 Autoscroll: Enabled
 ```
 
 ---
 
-## 🚨 Kemungkinan Masalah & Solusi
+## 🚨 Possible Problems & Solutions
 
-### Problem 1: Baud Rate Tidak 115200
+### Problem 1: Baud Rate Not 115200
 
-**Gejala:** Output ter-chaos, tidak terbaca
+**Symptoms:** Chaotic output, unreadable
 
-**Solusi:**
+**Solution:**
 
-1. Buka Tools → Serial Monitor
-2. Lihat combo box di kanan bawah
-3. Pastikan pilih 115200
-4. Klik tombol reset di ESP32 atau Upload ulang
+1. Open Tools → Serial Monitor
+2. Look at combo box at bottom right
+3. Make sure select 115200
+4. Click reset button on ESP32 or re-upload
 
 ---
 
-### Problem 2: SSID Tidak Ditemukan
+### Problem 2: SSID Not Found
 
-**Gejala:** Scan menunjukkan networks, tapi SSID target tidak ada
+**Symptoms:** Scan shows networks, but target SSID not there
 
-**Solusi:**
+**Solution:**
 
 1. Check SSID spelling (CASE-SENSITIVE!)
-2. Pastikan WiFi tidak hidden
-3. Pastikan WiFi broadcasting di 2.4GHz (bukan 5GHz!)
-4. Restart router dan coba lagi
+2. Make sure WiFi is not hidden
+3. Make sure WiFi is broadcasting on 2.4GHz (not 5GHz!)
+4. Restart router and try again
 
 ---
 
-### Problem 3: SSID Ditemukan tapi Gagal Connect
+### Problem 3: SSID Found but Connection Failed
 
-**Gejala:** WiFi muncul di scan, tapi statusnya stuck
+**Symptoms:** WiFi appears in scan, but status stuck
 
-**Solusi - Coba satu per satu:**
+**Solutions - Try one by one:**
 
 #### A. Check Password
 
 ```
-- Pastikan tidak ada spasi di awal/akhir
-- Password CASE-SENSITIVE
-- Copy/paste lebih baik dari ketik manual
+- Make sure no spaces at beginning/end
+- Password is CASE-SENSITIVE
+- Copy/paste better than manual typing
 ```
 
 #### B. WiFi Authentication
 
 ```
-Coba update kode, ubah WiFi mode:
+Try updating code, change WiFi mode:
 
 WiFi.mode(WIFI_STA);
 WiFi.setAutoConnect(true);
@@ -154,17 +154,17 @@ WiFi.begin(SSID, PASSWORD);
 #### C. Manual Delay
 
 ```
-Coba tambahkan delay lebih lama di setup:
+Try adding longer delay in setup:
 
 Serial.begin(115200);
-delay(3000);  // Lebih lama untuk USB init
+delay(3000);  // Longer for USB init
 ```
 
 #### D. Reset WiFi
 
 ```cpp
-// Tambahkan sebelum WiFi.begin():
-WiFi.disconnect(true);  // Disconnect dan turn off
+// Add before WiFi.begin():
+WiFi.disconnect(true);  // Disconnect and turn off
 delay(2000);
 WiFi.mode(WIFI_STA);
 WiFi.begin(SSID, PASSWORD);
@@ -172,16 +172,16 @@ WiFi.begin(SSID, PASSWORD);
 
 ---
 
-### Problem 4: Baud Rate di Kode Salah
+### Problem 4: Wrong Baud Rate in Code
 
-**Gejala:** Serial tidak sync
+**Symptoms:** Serial not in sync
 
 **Solution:** Update setup() di sketch:
 
 ```cpp
 void setup()
 {
-    Serial.begin(115200);  // HARUS ini, bukan 9600!
+    Serial.begin(115200);  // MUST be this, not 9600!
     delay(2000);  // Important!
 
     // ... rest of code
@@ -192,22 +192,22 @@ void setup()
 
 ### Problem 5: USB Cable Issue
 
-**Gejala:** Board terdeteksi tapi upload timeout
+**Symptoms:** Board detected but upload timeout
 
-**Solusi:**
+**Solutions:**
 
-- Gunakan USB cable yang BAGUS (data cable, bukan charge-only)
-- Coba USB port yang berbeda
-- Coba di USB 2.0 port (jika punya), bukan USB 3.0
+- Use a GOOD USB cable (data cable, not charge-only)
+- Try different USB port
+- Try USB 2.0 port (if available), not USB 3.0
 - Restart Arduino IDE
 
 ---
 
-### Problem 6: ESP32 Board Belum Install
+### Problem 6: ESP32 Board Not Installed
 
-**Gejala:** Error "unknown board" saat upload
+**Symptoms:** "unknown board" error when uploading
 
-**Solusi:**
+**Solution:**
 
 1. File → Preferences
 2. Additional Boards Manager URLs, paste:
@@ -222,16 +222,16 @@ void setup()
 
 ## ✅ Testing Sequence
 
-Ikuti urutan ini untuk debug:
+Follow this sequence for debugging:
 
 ### Test 1: USB Connection
 
 ```
-1. Connect ESP32 ke laptop
-2. Buka Device Manager
-3. Lihat di "Ports (COM & LPT)"
-4. Cari "CH340" atau "USB-SERIAL"
-5. Catat nomor COM (COM3, COM4, dll)
+1. Connect ESP32 to laptop
+2. Open Device Manager
+3. Look in "Ports (COM & LPT)"
+4. Find "CH340" or "USB-SERIAL"
+5. Note the COM number (COM3, COM4, etc)
 ```
 
 ### Test 2: Arduino IDE Setup
@@ -239,15 +239,15 @@ Ikuti urutan ini untuk debug:
 ```
 1. Tools → Board → "ESP32 Dev Module"
 2. Tools → Upload Speed → 115200
-3. Tools → Port → Pilih COM yang benar
+3. Tools → Port → Select correct COM
 4. Tools → Get Board Info
-5. Lihat apakah detect board
+5. Check if board is detected
 ```
 
 ### Test 3: Baud Rate Test
 
 ```
-1. Buka Serial Monitor (Ctrl+Shift+M)
+1. Open Serial Monitor (Ctrl+Shift+M)
 2. Pastikan Baud 115200
 3. Klik tombol reset di ESP32
 4. Lihat output

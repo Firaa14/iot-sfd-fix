@@ -1,5 +1,5 @@
 import React from 'react'
-import { Flame, Droplets, Zap, AlertCircle } from 'lucide-react'
+// Icons imported from lucide-react but handled in component rendering
 import clsx from 'clsx'
 import { StatCardProps } from '../../types'
 
@@ -13,8 +13,8 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   const statusColors = {
     normal: 'border-slate-700 hover:border-slate-600',
-    warning: 'border-yellow-600 hover:border-yellow-500 bg-yellow-500/5',
-    danger: 'border-red-600 hover:border-red-500 bg-red-500/5',
+    warning: 'border-yellow-500/50 hover:border-yellow-500/70 bg-yellow-500/5',
+    danger: 'border-red-500/50 hover:border-red-500/70 bg-red-500/5',
   }
 
   return (
@@ -27,7 +27,7 @@ export const StatCard: React.FC<StatCardProps> = ({
       <div className="flex items-start justify-between mb-4">
         <h3 className="text-slate-4 00 text-sm font-medium">{title}</h3>
         <div className={clsx(
-          'p-2 rounded-lg',
+          'p-2 rounded-lg transition-all duration-200',
           status === 'danger' ? 'bg-red-500/20 text-red-400' :
           status === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
           'bg-slate-700/50 text-slate-300'
@@ -91,11 +91,22 @@ interface StatusBadgeProps {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
   const statusConfig = {
-    NORMAL: { color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: '✓' },
-    ALERT: { color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: '⚠' },
-    WARNING: { color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: '!' },
-    IDLE: { color: 'bg-slate-500/20 text-slate-400 border-slate-500/30', icon: '—' },
-    ON: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: '◉' },
+    NORMAL: { color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: '✓', animate: false, glow: '' },
+    ALERT: { color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: '⚠', animate: false, glow: '' },
+    WARNING: {
+      color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      icon: '⚠',
+      animate: false,
+      glow: ''
+    },
+    CRITICAL: {
+      color: 'bg-red-500/20 text-red-400 border-red-500/30',
+      icon: '🚨',
+      animate: false,
+      glow: ''
+    },
+    IDLE: { color: 'bg-slate-500/20 text-slate-400 border-slate-500/30', icon: '—', animate: false, glow: '' },
+    ON: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: '◉', animate: false, glow: '' },
   }
 
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.NORMAL

@@ -1,6 +1,10 @@
 import React, { useMemo } from 'react'
-import { Activity, Clock, FileText, Settings, BarChart3, Flame } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { Activity, FileText, Settings, BarChart3, Flame, LogOut, User } from 'lucide-react'
 import clsx from 'clsx'
+import { RealtimeClock } from '../Shared/RealtimeClock'
+import { FirebaseConnectionMonitor } from '../Shared/FirebaseConnectionMonitor'
+import { useAuth } from '../../auth/AuthContext'
 
 interface SidebarLink {
   id: string
@@ -10,20 +14,33 @@ interface SidebarLink {
 }
 
 interface LayoutProps {
-  currentPage: string
-  onPageChange: (page: string) => void
   children: React.ReactNode
 }
 
 const SIDEBAR_LINKS: SidebarLink[] = [
-  { id: 'overview', label: 'Overview', icon: <Activity size={20} />, href: '#' },
-  { id: 'live-monitor', label: 'Live Monitor', icon: <BarChart3 size={20} />, href: '#' },
-  { id: 'history', label: 'History', icon: <Clock size={20} />, href: '#' },
-  { id: 'event-log', label: 'Event Log', icon: <FileText size={20} />, href: '#' },
-  { id: 'settings', label: 'Settings', icon: <Settings size={20} />, href: '#' },
+  { id: 'overview', label: 'Overview', icon: <Activity size={20} />, href: '/' },
+  { id: 'live-monitor', label: 'Live Monitor', icon: <BarChart3 size={20} />, href: '/live-monitor' },
+  { id: 'history', label: 'History', icon: <Flame size={20} />, href: '/history' },
+  { id: 'event-log', label: 'Event Log', icon: <FileText size={20} />, href: '/event-log' },
+  { id: 'settings', label: 'Settings', icon: <Settings size={20} />, href: '/settings' },
 ]
 
-export const Layout: React.FC<LayoutProps> = ({ currentPage, onPageChange, children }) => {
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const location = useLocation()
+  const { user, logout } = useAuth()
+
+  const currentPage = useMemo(() => {
+    const path = location.pathname
+    if (path === '/') return 'overview'
+    return path.substring(1) // Remove leading slash
+  }, [location.pathname])
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      logout()
+    }
+  }
+
   // Memoize sidebar links dan logo agar tidak re-render
   const sidebarContent = useMemo(() => (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen overflow-hidden flex-shrink-0">
@@ -40,12 +57,32 @@ export const Layout: React.FC<LayoutProps> = ({ currentPage, onPageChange, child
         </div>
       </div>
 
+      {/* User Info Section */}
+      <div className="p-4 border-b border-slate-800 flex-shrink-0">
+        <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
+          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <User size={16} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-medium truncate">{user?.name || 'User'}</p>
+            <p className="text-slate-400 text-xs truncate">{user?.email || ''}</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+            title="Logout"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      </div>
+
       {/* Navigation Menu - PERSISTENT */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {SIDEBAR_LINKS.map((link) => (
-          <button
+          <Link
             key={link.id}
-            onClick={() => onPageChange(link.id)}
+            to={link.href}
             className={clsx(
               'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
               currentPage === link.id
@@ -55,18 +92,24 @@ export const Layout: React.FC<LayoutProps> = ({ currentPage, onPageChange, child
           >
             {link.icon}
             <span className="font-medium whitespace-nowrap">{link.label}</span>
-          </button>
+          </Link>
         ))}
       </nav>
 
-      {/* Device Info Footer - ALWAYS VISIBLE */}
-      <div className="p-4 border-t border-slate-800 flex-shrink-0 text-slate-500 text-xs">
-        <p>Device: ESP32-WH-01-21</p>
-        <p>v2.4.1-stable</p>
+      {/* Status Section - Real-time Clock & Connection Monitor */}
+      <div className="p-4 space-y-3 border-t border-slate-800 flex-shrink-0">
+        <RealtimeClock />
+        <FirebaseConnectionMonitor />
+
+        {/* Device Info */}
+        <div className="p-3 bg-slate-800/50 rounded text-slate-400 text-xs">
+          <p className="font-semibold">Device: ESP32-WH-01-21</p>
+          <p>v2.4.1-stable</p>
+          <p className="mt-2 text-slate-500">🔴 Real-time listeners ACTIVE</p>
+        </div>
       </div>
     </aside>
-  ), [currentPage, onPageChange])
-
+  ), [currentPage, user, logout])
   return (
     <div className="flex h-screen w-screen bg-slate-950 overflow-hidden">
       {/* PERSISTENT SIDEBAR - NEVER MOVES OR RE-RENDERS */}

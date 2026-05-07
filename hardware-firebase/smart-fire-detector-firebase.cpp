@@ -402,7 +402,7 @@ float readUltrasonic()
     return (distance > 0) ? distance : -1;
 }
 
-// ========== UPDATE FIREBASE DATA ==========
+// ========== UPDATE FIREBASE DATA WITH SERVER TIMESTAMP ==========
 void updateFirebaseData()
 {
     if (!Firebase.ready())
@@ -414,23 +414,32 @@ void updateFirebaseData()
     // Build JSON path
     String basePath = "/sensors/current";
 
-    // Update individual fields for better performance
-    Firebase.RTDB.setDouble(&fbdo, basePath + "/temperature", currentData.temperature);
-    Firebase.RTDB.setDouble(&fbdo, basePath + "/humidity", currentData.humidity);
-    Firebase.RTDB.setDouble(&fbdo, basePath + "/waterLevel", currentData.waterLevel);
-    Firebase.RTDB.setDouble(&fbdo, basePath + "/waterVolume", currentData.waterVolume);
-    Firebase.RTDB.setString(&fbdo, basePath + "/flameSensor", currentData.flameSensorState);
-    Firebase.RTDB.setString(&fbdo, basePath + "/pumpState", currentData.pumpState);
-    Firebase.RTDB.setInt(&fbdo, basePath + "/servoPosition", currentData.servoPosition);
-    Firebase.RTDB.setInt(&fbdo, basePath + "/timestamp", currentData.timestamp);
+    // Create JSON object with server timestamp
+    FirebaseJson jsonData;
+    jsonData.set("temperature", currentData.temperature);
+    jsonData.set("humidity", currentData.humidity);
+    jsonData.set("waterLevel", currentData.waterLevel);
+    jsonData.set("waterVolume", currentData.waterVolume);
+    jsonData.set("flameSensor", currentData.flameSensorState);
+    jsonData.set("pumpState", currentData.pumpState);
+    jsonData.set("servoPosition", currentData.servoPosition);
+    // Use Firebase server timestamp instead of device millis()
+    jsonData.set("timestamp", Firebase.getServerTime(&fbdo));
+
+    // Update the entire object at once (more efficient)
+    Firebase.RTDB.setJSON(&fbdo, basePath, &jsonData);
+
+    // Also save to historical data with server timestamp
+    String historyPath = "/sensors/history/" + String(Firebase.getServerTime(&fbdo));
+    Firebase.RTDB.setJSON(&fbdo, historyPath, &jsonData);
 
     // Update last sync time
     Firebase.RTDB.setInt(&fbdo, "/device/lastUpdate", millis());
 
-    Serial.println("[FIREBASE] Data updated to database");
+    Serial.println("[FIREBASE] Data updated to database with SERVER TIMESTAMP");
 }
 
-// ========== EVENT LOGGING ==========
+// ========== EVENT LOGGING WITH SERVER TIMESTAMP ==========
 void createEvent(String eventType)
 {
     if (!Firebase.ready())
@@ -438,25 +447,40 @@ void createEvent(String eventType)
 
     String eventPath = "/events/" + String(millis());
 
-    Firebase.RTDB.setString(&fbdo, eventPath + "/type", eventType);
-    Firebase.RTDB.setString(&fbdo, eventPath + "/status", "NORMAL");
-    Firebase.RTDB.setString(&fbdo, eventPath + "/details", "Automatic system response triggered");
-    Firebase.RTDB.setString(&fbdo, eventPath + "/source", DEVICE_ID);
-    Firebase.RTDB.setInt(&fbdo, eventPath + "/timestamp", millis());
+    // Create JSON object with server timestamp
+    FirebaseJson eventData;
+    eventData.set("type", eventType);
+    eventData.set("status", "NORMAL");
+    eventData.set("details", "Automatic system response triggered");
+    eventData.set("source", DEVICE_ID);
+    // Use Firebase server timestamp instead of device millis()
+    eventData.set("timestamp", Firebase.getServerTime(&fbdo));
+
+    Firebase.RTDB.setJSON(&fbdo, eventPath, &eventData);
 
     Serial.print("[EVENT] Logged: ");
     Serial.println(eventType);
 }
 
-// ========== FIRE DETECTION HANDLER ==========
+// ========== FIRE DETECTION HANDLER WITH SERVER TIMESTAMP ==========
 void handleFireDetection()
 {
     // Create fire alert event
     if (Firebase.ready())
     {
         String eventPath = "/events/" + String(millis());
-        Firebase.RTDB.setString(&fbdo, eventPath + "/type", "FIRE_DETECTED");
-        Firebase.RTDB.setString(&fbdo, eventPath + "/details", "Fire detected! Pump activated automatically");
-        Firebase.RTDB.setString(&fbdo, eventPath + "/source", DEVICE_ID);
+
+        // Create JSON object with server timestamp
+        FirebaseJson fireEvent;
+        fireEvent.set("type", "FIRE_DETECTED");
+        fireEvent.set("status", "ALERT");
+        fireEvent.set("details", "Fire detected! Pump activated automatically");
+        fireEvent.set("source", DEVICE_ID);
+        // Use Firebase server timestamp
+        fireEvent.set("timestamp", Firebase.getServerTime(&fbdo));
+
+        Firebase.RTDB.setJSON(&fbdo, eventPath, &fireEvent);
+
+        Serial.println("[FIRE ALERT] Event logged with SERVER TIMESTAMP");
     }
 }

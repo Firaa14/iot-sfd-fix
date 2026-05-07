@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   LineChart,
   Line,
@@ -10,23 +10,113 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { StatCard } from '../Shared/Cards'
-import { Thermometer, Droplets, Activity } from 'lucide-react'
+import { Thermometer, Droplets, Activity, Flame } from 'lucide-react'
 
 interface HistoryProps {
-  current: any
+  historicalData: any[]
+  fireIncidentsCount: number
+  onDateRangeChange?: (dateRange: { start: Date; end: Date } | undefined) => void
 }
 
-export const History: React.FC<HistoryProps> = ({ current }) => {
-  // Mock historical data untuk 24 jam
-  const historicalData = [
-    { time: '00:00', temp: 26.5, humidity: 60.2, waterLevel: 50 },
-    { time: '04:00', temp: 25.8, humidity: 62.1, waterLevel: 49.8 },
-    { time: '08:00', temp: 27.2, humidity: 61.5, waterLevel: 49.5 },
-    { time: '12:00', temp: 28.1, humidity: 63.2, waterLevel: 49.2 },
-    { time: '16:00', temp: 29.5, humidity: 65.8, waterLevel: 48.9 },
-    { time: '20:00', temp: 27.9, humidity: 64.2, waterLevel: 48.7 },
-    { time: '23:59', temp: 27.4, humidity: 64.2, waterLevel: 48.7 },
-  ]
+export const History: React.FC<HistoryProps> = ({
+  historicalData,
+  fireIncidentsCount,
+  onDateRangeChange
+}) => {
+  const [selectedPeriod, setSelectedPeriod] = useState('24h')
+
+  // Log when historical data is updated (for debugging real-time updates)
+  React.useEffect(() => {
+    console.log('[History] 📊 Historical data updated from Firebase (SAME PATH AS OVERVIEW: sensors/current):', historicalData.length, 'records')
+    if (historicalData.length > 0) {
+      console.log('[History] 🆕 Latest reading (from sensors/current):', {
+        temperature: historicalData[0]?.temperature,
+        humidity: historicalData[0]?.humidity,
+        flameSensor: historicalData[0]?.flameSensor,
+        timestamp: historicalData[0]?.timestamp,
+        localTime: historicalData[0]?.localTime,
+      })
+    } else {
+      console.log('[History] ℹ️ No historical data available from sensors/current')
+    }
+  }, [historicalData])
+
+  // Handle period selection and date range filtering
+  const handlePeriodChange = (period: string) => {
+    setSelectedPeriod(period)
+
+    if (onDateRangeChange) {
+      const now = new Date()
+      let startDate: Date
+
+      switch (period) {
+        case '24h':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+          break
+        case '7d':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          break
+        case '30d':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          break
+        case '90d':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          break
+        default:
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      }
+
+      onDateRangeChange({ start: startDate, end: now })
+    }
+  }
+  // Process historical data for display
+  const chartData = useMemo(() => {
+    if (!historicalData || historicalData.length === 0) {
+      return []
+    }
+
+    // Take latest 24 records for chart display
+    return historicalData.slice(0, 24).map((record) => {
+      const timestamp = typeof record.timestamp === 'string' 
+        ? new Date(record.timestamp).getTime() 
+        : record.timestamp
+      return {
+        time: new Date(timestamp).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        temp: record.temperature || 0,
+        humidity: record.humidity || 0,
+        waterLevel: record.waterLevel || 0,
+        timestamp: timestamp,
+      }
+    }).reverse() // Reverse to show oldest first for time-series
+  }, [historicalData])
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    if (!historicalData || historicalData.length === 0) {
+      return {
+        avgTemp: 0,
+        avgHumidity: 0,
+        totalRecords: 0,
+        fireIncidents: fireIncidentsCount,
+      }
+    }
+
+    const temps = historicalData.map((d) => d.temperature || 0)
+    const humidities = historicalData.map((d) => d.humidity || 0)
+
+    const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length
+    const avgHumidity = humidities.reduce((a, b) => a + b, 0) / humidities.length
+
+    return {
+      avgTemp: parseFloat(avgTemp.toFixed(1)),
+      avgHumidity: parseFloat(avgHumidity.toFixed(1)),
+      totalRecords: historicalData.length,
+      fireIncidents: fireIncidentsCount,
+    }
+  }, [historicalData, fireIncidentsCount])
 
   return (
     <div className="p-6 space-y-6">
@@ -37,25 +127,33 @@ export const History: React.FC<HistoryProps> = ({ current }) => {
       </div>
 
       {/* Historical Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard
           title="Avg Temperature"
-          value={27.4}
+          value={stats.avgTemp}
           unit="°C"
           icon={<Thermometer size={24} />}
-          trend={2.4}
+          trend={0}
         />
         <StatCard
           title="Avg Humidity"
-          value={64.2}
+          value={stats.avgHumidity}
           unit="%"
           icon={<Droplets size={24} />}
-          trend={-1.2}
+          trend={0}
         />
         <StatCard
-          title="Total Pump Runtime"
-          value="12m 45s"
+          title="Total Records"
+          value={stats.totalRecords}
+          unit="readings"
           icon={<Activity size={24} />}
+          trend={0}
+        />
+        <StatCard
+          title="Fire Incidents"
+          value={stats.fireIncidents}
+          unit="events"
+          icon={<Flame size={24} />}
           trend={0}
         />
       </div>
@@ -65,8 +163,9 @@ export const History: React.FC<HistoryProps> = ({ current }) => {
         {['24h', '7d', '30d', '90d'].map((period) => (
           <button
             key={period}
+            onClick={() => handlePeriodChange(period)}
             className={`px-4 py-2 rounded-lg transition-colors ${
-              period === '24h'
+              selectedPeriod === period
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-600'
             }`}
@@ -80,11 +179,16 @@ export const History: React.FC<HistoryProps> = ({ current }) => {
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-white mb-1">Sensor Time-Series</h2>
-          <p className="text-slate-400 text-sm">Temperature, Humidity, and Water Level trends</p>
+          <p className="text-slate-400 text-sm">Temperature, Humidity, and Water Level trends (Real-time from Firebase)</p>
         </div>
 
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={historicalData}>
+        {chartData.length === 0 ? (
+          <div className="w-full h-96 flex items-center justify-center">
+            <p className="text-slate-400">No historical data available yet. Wait for sensor readings to appear...</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
             <XAxis
               dataKey="time"
@@ -130,6 +234,7 @@ export const History: React.FC<HistoryProps> = ({ current }) => {
             />
           </LineChart>
         </ResponsiveContainer>
+        )}
       </div>
 
       {/* Statistics */}

@@ -11,8 +11,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { SensorReading } from '../../types'
-import { StatCard, HealthCard, StatusBadge } from '../Shared/Cards'
+import { SensorReading, SystemSettings } from '../../types'
+import { StatCard, HealthCard } from '../Shared/Cards'
 
 interface OverviewProps {
   current: SensorReading | null
@@ -20,15 +20,36 @@ interface OverviewProps {
   health: any
   recentEvents: any[]
   isFireDetected?: boolean
+  settings?: SystemSettings | null
 }
 
 export const Overview: React.FC<OverviewProps> = ({
   current,
   device,
-  health,
+
   recentEvents,
   isFireDetected = false,
+  settings,
 }) => {
+  // Force re-render when settings change
+  React.useEffect(() => {
+    // This effect ensures the component re-renders when settings change
+  }, [settings])
+  // Log current sensor data for debugging (same path as History: sensors/current)
+  React.useEffect(() => {
+    if (current) {
+      console.log('[Overview] 📊 Current sensor data from Firebase (PATH: sensors/current):', {
+        temperature: current.temperature,
+        humidity: current.humidity,
+        flameSensor: current.flameSensor,
+        pumpState: current.pumpState,
+        timestamp: current.timestamp,
+        localTime: new Date(current.timestamp).toLocaleString(),
+      })
+    } else {
+      console.log('[Overview] ℹ️ No current sensor data available from sensors/current')
+    }
+  }, [current])
   if (!current) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-slate-950">
@@ -64,8 +85,8 @@ export const Overview: React.FC<OverviewProps> = ({
               <AlertTriangle size={32} className="text-white animate-bounce" />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold text-white mb-1">🚨 PERINGATAN API TERDETEKSI 🚨</h2>
-              <p className="text-red-100">Sistem penyiram otomatis sedang beraksi. Area bahaya! Jangan mendekati sistem secara langsung.</p>
+              <h2 className="text-2xl font-bold text-white mb-1">🚨 FIRE DETECTED - ALERT STATUS 🚨</h2>
+              <p className="text-red-100">Automatic sprinkler system is responding. Stay away from dangerous area!</p>
             </div>
             <Flame size={32} className="text-yellow-200 animate-bounce hidden sm:block" />
           </div>
@@ -82,7 +103,7 @@ export const Overview: React.FC<OverviewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Current Status"
-          value={isFireDetected ? '🔥 WASPADA' : 'AMAN'}
+          value={isFireDetected ? '🔥 ALERT' : 'SAFE'}
           icon={<Activity size={24} />}
           status={isFireDetected ? 'danger' : 'normal'}
         />
@@ -104,7 +125,12 @@ export const Overview: React.FC<OverviewProps> = ({
           value={current.waterLevel.toFixed(1)}
           unit="cm"
           icon={<Droplets size={24} />}
-          status={current.waterLevel < 10 ? 'warning' : 'normal'}
+          status={
+            !settings ? 'normal' :
+            current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold ? 'normal' :
+            current.waterLevel > settings.automation.waterLevelThreshold && current.waterLevel <= settings.automation.waterLevelThreshold + 2 ? 'warning' :
+            current.waterLevel > settings.automation.waterLevelThreshold + 2 ? 'danger' : 'normal'
+          }
         />
       </div>
 

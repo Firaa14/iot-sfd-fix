@@ -13,6 +13,23 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
   const [filter, setFilter] = useState('All')
   const [searchTerm, setSearchTerm] = useState('')
   const [showDateRangePicker, setShowDateRangePicker] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(50)
+
+  // Log when events are updated (for debugging real-time updates)
+  React.useEffect(() => {
+    console.log('[EventLog] 📊 Events updated from Firebase (PATH: events, SAME AS OVERVIEW):', events.length, 'events')
+    if (events.length > 0) {
+      console.log('[EventLog] 🆕 Latest event (from events path):', {
+        type: events[0]?.type,
+        timestamp: events[0]?.timestamp,
+        localTime: new Date(events[0]?.timestamp).toLocaleString(),
+        message: events[0]?.details
+      })
+    } else {
+      console.log('[EventLog] ℹ️ No events available from events path')
+    }
+  }, [events])
 
   const eventTypes = ['All', 'FIRE_DETECTED', 'WATER_LEVEL_LOW', 'PUMP_ACTIVATED', 'PUMP_DEACTIVATED']
 
@@ -43,17 +60,41 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
     }
   }
 
-  const filteredEvents = events.filter((event) => {
-    const matchesFilter = filter === 'All' || event.type === filter
-    const matchesSearch =
-      event.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.details.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesFilter && matchesSearch
-  })
+  const filteredEvents = events
+    // Sort by timestamp descending (newest first)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .filter((event) => {
+      const matchesFilter = filter === 'All' || event.type === filter
+      const matchesSearch =
+        event.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.details.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchesFilter && matchesSearch
+    })
+
+  // Pagination logic
+  const totalEvents = filteredEvents.length
+  const totalPages = Math.ceil(totalEvents / rowsPerPage)
+  const startIndex = (currentPage - 1) * rowsPerPage
+  const endIndex = startIndex + rowsPerPage
+  const paginatedEvents = filteredEvents.slice(startIndex, endIndex)
+
+  // Reset to first page when filter changes
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [filter, searchTerm])
+
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    setRowsPerPage(newRowsPerPage)
+    setCurrentPage(1) // Reset to first page
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleExportCSV = (startDate: Date, endDate: Date) => {
     const dateFilteredEvents = filterEventsByDateRange(filteredEvents, startDate, endDate)
-    const filename = `events_${startDate.toLocaleDateString('id-ID')}_to_${endDate.toLocaleDateString('id-ID')}.csv`
+    const filename = `events_${startDate.toLocaleDateString('en-US')}_to_${endDate.toLocaleDateString('en-US')}.csv`
     exportEventsToCSV(dateFilteredEvents, filename)
   }
 
@@ -128,9 +169,9 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredEvents.length > 0 ? (
-                filteredEvents.map((event, idx) => (
-                  <tr key={idx} className="border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors">
+              {paginatedEvents.length > 0 ? (
+                paginatedEvents.map((event, idx) => (
+                  <tr key={`${event.id}-${idx}`} className="border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors">
                     <td className="px-6 py-4 text-slate-300">
                       {new Date(event.timestamp).toLocaleString()}
                     </td>
@@ -163,6 +204,77 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalEvents > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-700 bg-slate-900/50">
+            {/* Rows per page selector */}
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <span>Rows per page:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-slate-600"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+
+            {/* Page info */}
+            <div className="text-sm text-slate-400">
+              {totalEvents > 0 ? (
+                <>
+                  {startIndex + 1}-{Math.min(endIndex, totalEvents)} of {totalEvents} events
+                </>
+              ) : (
+                'No events'
+              )}
+            </div>
+
+            {/* Page navigation */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                  if (pageNum > totalPages) return null
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={clsx(
+                        'px-3 py-1 border rounded transition-colors',
+                        currentPage === pageNum
+                          ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                      )}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer Info */}

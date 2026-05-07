@@ -37,12 +37,12 @@ iot-sfd/
 
 ### 1. Firebase Setup
 
-Buat Firebase project:
+Create Firebase project:
 
-1. Pergi ke [Firebase Console](https://console.firebase.google.com)
-2. Buat project baru: "SmartFire"
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Create new project: "SmartFire"
 3. Enable Realtime Database
-4. Buat database di lokasi yang dekat
+4. Create database in nearby location
 
 ```json
 {

@@ -1,36 +1,36 @@
 # SmartFire - IoT Fire Detection System
 
-Complete IoT fire detection system dengan real-time monitoring web dashboard.
+Complete IoT fire detection system with real-time monitoring web dashboard.
 
 ## 🎯 Features
 
 ### 5 Main Dashboard Pages
 
-1. **Overview** - Dashboard utama dengan real-time status
-   - Status cards (Suhu, Kelembaban, Level Air, Flame)
+1. **Overview** - Main dashboard with real-time status
+   - Status cards (Temperature, Humidity, Water Level, Flame)
    - Temperature & Humidity chart
    - System health indicators
    - Recent activity log
 
-2. **Live Monitor** - Monitoring sensor real-time
+2. **Live Monitor** - Real-time sensor monitoring
    - Individual sensor detail cards
-   - Current readings dengan status
+   - Current readings with status
    - Sensor-specific information
-   - Auto-update setiap perubahan
+   - Auto-update on every change
 
-3. **History** - Analisis data historis
-   - Time-series chart untuk 24 jam
+3. **History** - Historical data analysis
+   - Time-series chart for 24 hours
    - Statistical analysis (min/max/avg)
    - Multiple time period selectors
    - System performance metrics
 
-4. **Event Log** - Riwayat event sistem
+4. **Event Log** - System event history
    - Searchable event table
    - Filter by event type
    - Status indicators
    - Export CSV
 
-5. **Settings** - Konfigurasi sistem
+5. **Settings** - System configuration
    - Automated suppression parameters
    - Device management
    - Factory reset option
@@ -148,7 +148,7 @@ npm install
 
 # Create .env file
 cp .env.example .env
-# Edit .env dengan Firebase credentials
+# Edit .env with Firebase credentials
 
 # Run development server
 npm run dev

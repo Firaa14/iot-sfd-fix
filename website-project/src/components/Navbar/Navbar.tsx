@@ -83,10 +83,16 @@ export const Navbar: React.FC<NavbarProps> = ({ isFireDetected, current, health,
             </div>
 
             {/* Water Level Warning */}
-            {current && current.waterLevel < 10 && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-lg hidden sm:flex">
-                <AlertTriangle size={14} className="text-yellow-400 flex-shrink-0" />
-                <span className="text-xs text-yellow-300 whitespace-nowrap">Water Low</span>
+            {current && (current.waterLevel > 6 || current.waterLevel > 8) && (
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-lg hidden sm:flex border ${
+                current.waterLevel > 8
+                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                  : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+              }`}>
+                <AlertTriangle size={14} className="flex-shrink-0" />
+                <span className="text-xs whitespace-nowrap font-medium">
+                  {current.waterLevel > 8 ? 'Water Empty' : 'Water Alert'}
+                </span>
               </div>
             )}
           </div>

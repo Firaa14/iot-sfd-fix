@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Unsubscribe } from 'firebase/database'
 
 /**
  * Custom hook for Firebase real-time listeners
+ * Ensures listener persists and doesn't re-subscribe on re-renders
  */
 export const useFirebaseListener = <T>(
   subscriptionFn: (callback: (data: T) => void) => Unsubscribe,
@@ -11,36 +12,57 @@ export const useFirebaseListener = <T>(
   const [data, setData] = useState<T>(initialValue)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Use refs to ensure subscription functions are stable
+  const unsubscribeRef = useRef<Unsubscribe | null>(null)
+  const isSubscribedRef = useRef(false)
 
   useEffect(() => {
+    // Prevent multiple subscriptions
+    if (isSubscribedRef.current) {
+      console.log('[useFirebaseListener] Already subscribed, skipping...')
+      return
+    }
+
     try {
-      setLoading(true)
-      console.log('[useFirebaseListener] Setting up subscription...')
+      console.log('[useFirebaseListener] Setting up PERSISTENT subscription...')
+      isSubscribedRef.current = true
       
-      const unsubscribe = subscriptionFn((newData) => {
-        console.log('[useFirebaseListener] Data updated:', newData)
+      // Create stable callback that won't change
+      const handleDataUpdate = (newData: T) => {
+        console.log('[useFirebaseListener] Real-time data update received:', new Date().toISOString(), newData)
         setData(newData)
         setLoading(false)
         setError(null)
-      })
+      }
 
+      // Subscribe once
+      unsubscribeRef.current = subscriptionFn(handleDataUpdate)
+
+      // Cleanup on unmount only
       return () => {
-        console.log('[useFirebaseListener] Unsubscribing...')
-        unsubscribe()
+        console.log('[useFirebaseListener] Component unmounting, unsubscribing...')
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current()
+          isSubscribedRef.current = false
+        }
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-      console.error('[useFirebaseListener] Error:', errorMsg)
+      console.error('[useFirebaseListener] Subscription error:', errorMsg)
       setError(errorMsg)
       setLoading(false)
+      isSubscribedRef.current = false
     }
-  }, [subscriptionFn])
+    // IMPORTANT: Empty dependency array - subscribe ONCE on mount only
+  }, [])
 
   return { data, loading, error }
 }
 
 /**
  * Hook untuk multiple Firebase listeners
+ * Each listener runs independently and persists
  */
 export const useMultipleFirebaseListeners = <T extends Record<string, any>>(
   subscriptions: {
@@ -66,7 +88,7 @@ export const useMultipleFirebaseListeners = <T extends Record<string, any>>(
 
     try {
       Object.entries(subscriptions).forEach(([key, { subscribe }]) => {
-        const unsubscribe = subscribe((newData) => {
+        const unsubscribe = subscribe((newData: any) => {
           setData((prev) => ({
             ...prev,
             [key]: newData,

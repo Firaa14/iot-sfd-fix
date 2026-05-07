@@ -1,15 +1,40 @@
 import React from 'react'
 import { Thermometer, Droplets, Flame, Activity, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
-import { SensorReading } from '../../types'
+import { SensorReading, SystemSettings } from '../../types'
 import { StatCard, StatusBadge } from '../Shared/Cards'
 
 interface LiveMonitorProps {
   current: SensorReading | null
   isFireDetected?: boolean
+  settings?: SystemSettings | null
 }
 
-export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetected = false }) => {
+export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetected = false, settings }) => {
+  const getWaterLevelStatus = () => {
+    if (!current || !settings) return null
+
+    const threshold = settings.automation.waterLevelThreshold
+
+    // Normal: 2cm to threshold
+    if (current.waterLevel >= 2 && current.waterLevel <= threshold) return 'normal'
+
+    // Warning: threshold+0.1 to threshold+2
+    if (current.waterLevel > threshold && current.waterLevel <= threshold + 2) return 'warning'
+
+    // Critical: > threshold+2
+    if (current.waterLevel > threshold + 2) return 'critical'
+
+    return null
+  }
+
+  const waterStatus = getWaterLevelStatus()
+
+  // Force re-render when settings change
+  React.useEffect(() => {
+    // This effect ensures the component re-renders when settings change
+  }, [settings])
+
   if (!current) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -20,7 +45,6 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
 
   return (
     <div className={clsx('p-6 space-y-6', isFireDetected && 'bg-gradient-to-br from-red-950/30 to-slate-950')}>
-      {/* Fire Alert Banner */}
       {isFireDetected && (
         <div className="bg-gradient-to-r from-red-600 to-red-700 border-2 border-red-400 rounded-lg p-6 animate-pulse">
           <div className="flex items-center gap-4">
@@ -28,10 +52,40 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
               <AlertTriangle size={32} className="text-white animate-bounce" />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold text-white mb-1">🚨 API TERDETEKSI - STATUS WASPADA 🚨</h2>
-              <p className="text-red-100">Sistem sprinkler otomatis sedang merespons. Jangan dekati area berbahaya!</p>
+              <h2 className="text-2xl font-bold text-white mb-1">🚨 FIRE DETECTED - ALERT STATUS 🚨</h2>
+              <p className="text-red-100">Automatic sprinkler system is responding. Stay away from dangerous area!</p>
             </div>
             <Flame size={32} className="text-yellow-200 animate-bounce hidden sm:block" />
+          </div>
+        </div>
+      )}
+
+      {/* ALERT Status Banner */}
+      {waterStatus === 'warning' && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 shadow-sm transition-all duration-500 ease-in-out animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <AlertTriangle size={20} className="text-yellow-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-yellow-300">Warning Detected</h3>
+              <p className="text-yellow-200 text-sm">System detected abnormal condition</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Water Level Critical Banner */}
+      {waterStatus === 'critical' && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 shadow-sm transition-all duration-500 ease-in-out animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <AlertTriangle size={20} className="text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-300">Water Tank Empty</h3>
+              <p className="text-red-200 text-sm">Please refill the water tank immediately</p>
+            </div>
           </div>
         </div>
       )}
@@ -49,7 +103,7 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
           <p className="text-3xl font-bold text-white mb-4">Warehouse A</p>
           <div className="flex items-center gap-2">
             <div className={clsx('w-3 h-3 rounded-full animate-pulse', isFireDetected ? 'bg-red-500' : 'bg-green-500')} />
-            <span className={isFireDetected ? 'text-red-400' : 'text-green-400'}>{isFireDetected ? 'WASPADA - API TERDETEKSI' : 'AMAN - NORMAL'}</span>
+            <span className={isFireDetected ? 'text-red-400' : 'text-green-400'}>{isFireDetected ? 'ALERT - FIRE DETECTED' : 'SAFE - NORMAL'}</span>
           </div>
         </div>
 
@@ -158,7 +212,20 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Status:</span>
-              <StatusBadge status={current.waterLevel < 10 ? 'WARNING' : 'NORMAL'} label="Normal Level" />
+              <StatusBadge
+                status={
+                  !settings ? 'NORMAL' :
+                  current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold ? 'NORMAL' :
+                  current.waterLevel > settings.automation.waterLevelThreshold && current.waterLevel <= settings.automation.waterLevelThreshold + 2 ? 'WARNING' :
+                  current.waterLevel > settings.automation.waterLevelThreshold + 2 ? 'CRITICAL' : 'UNKNOWN'
+                }
+                label={
+                  !settings ? 'Loading...' :
+                  current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold ? `Normal (2-${settings.automation.waterLevelThreshold}cm)` :
+                  current.waterLevel > settings.automation.waterLevelThreshold && current.waterLevel <= settings.automation.waterLevelThreshold + 2 ? `Alert (${(settings.automation.waterLevelThreshold + 0.1).toFixed(1)}-${(settings.automation.waterLevelThreshold + 2).toFixed(1)}cm)` :
+                  current.waterLevel > settings.automation.waterLevelThreshold + 2 ? `Empty (>${(settings.automation.waterLevelThreshold + 2).toFixed(1)}cm)` : 'Unknown'
+                }
+              />
             </div>
             <div className="pt-3 border-t border-slate-700">
               <p className="text-xs text-slate-500">Ultrasonic Sensor</p>
