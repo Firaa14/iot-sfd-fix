@@ -26,7 +26,6 @@ interface OverviewProps {
 export const Overview: React.FC<OverviewProps> = ({
   current,
   device,
-
   recentEvents,
   isFireDetected = false,
   settings,
@@ -35,7 +34,8 @@ export const Overview: React.FC<OverviewProps> = ({
   React.useEffect(() => {
     // This effect ensures the component re-renders when settings change
   }, [settings])
-  // Log current sensor data for debugging (same path as History: sensors/current)
+
+  // Log current sensor data for debugging
   React.useEffect(() => {
     if (current) {
       console.log('[Overview] 📊 Current sensor data from Firebase (PATH: sensors/current):', {
@@ -50,6 +50,7 @@ export const Overview: React.FC<OverviewProps> = ({
       console.log('[Overview] ℹ️ No current sensor data available from sensors/current')
     }
   }, [current])
+
   if (!current) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-slate-950">
@@ -127,9 +128,10 @@ export const Overview: React.FC<OverviewProps> = ({
           icon={<Droplets size={24} />}
           status={
             !settings ? 'normal' :
-            current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold ? 'normal' :
-            current.waterLevel > settings.automation.waterLevelThreshold && current.waterLevel <= settings.automation.waterLevelThreshold + 2 ? 'warning' :
-            current.waterLevel > settings.automation.waterLevelThreshold + 2 ? 'danger' : 'normal'
+            // Perbaikan: Tambahkan .normal.max pada perbandingan threshold
+            current.waterLevel >= 2 && current.waterLevel <= settings.automation.waterLevelThreshold.normal.max ? 'normal' :
+            current.waterLevel > settings.automation.waterLevelThreshold.normal.max && current.waterLevel <= settings.automation.waterLevelThreshold.normal.max + 2 ? 'warning' :
+            current.waterLevel > settings.automation.waterLevelThreshold.normal.max + 2 ? 'danger' : 'normal'
           }
         />
       </div>
