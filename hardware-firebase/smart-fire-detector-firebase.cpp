@@ -120,17 +120,25 @@ void setup()
     setupWiFi();
     setupFirebase();
 
-    // Set NTP time
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    // Set NTP time (UTC+7 for WIB)
+    configTime(25200, 0, "pool.ntp.org", "time.nist.gov");
     Serial.println("Waiting for NTP time sync...");
     time_t now = time(nullptr);
-    while (now < 24 * 3600)
+    unsigned long ntpStart = millis();
+    while (now < 24 * 3600 && millis() - ntpStart < 10000)
     {
         delay(500);
         Serial.print(".");
         now = time(nullptr);
     }
-    Serial.println("\nTime synced!");
+    if (now >= 24 * 3600)
+    {
+        Serial.println("\nTime synced!");
+    }
+    else
+    {
+        Serial.println("\nNTP timeout - will use Firebase server time");
+    }
 
     // Update initial device status
     Firebase.RTDB.setString(&fbdo, "/device/lastUpdate", String(millis()));
@@ -423,15 +431,16 @@ void updateFirebaseData()
     jsonData.set("flameSensor", currentData.flameSensorState);
     jsonData.set("pumpState", currentData.pumpState);
     jsonData.set("servoPosition", currentData.servoPosition);
-    // Use Firebase server timestamp instead of device millis()
-    jsonData.set("timestamp", Firebase.getServerTime(&fbdo));
+    // Convert to milliseconds for JavaScript compatibility
+    // Firebase.getServerTime() returns Unix seconds, JS Date() needs milliseconds
+    double timestampMs = (double)Firebase.getServerTime(&fbdo) * 1000.0;
+    jsonData.set("timestamp", timestampMs);
 
     // Update the entire object at once (more efficient)
     Firebase.RTDB.setJSON(&fbdo, basePath, &jsonData);
 
-    // Also save to historical data with server timestamp
-    String historyPath = "/sensors/history/" + String(Firebase.getServerTime(&fbdo));
-    Firebase.RTDB.setJSON(&fbdo, historyPath, &jsonData);
+    // Also save to historical data with unique push ID (ensures no data is ever overwritten)
+    Firebase.RTDB.pushJSON(&fbdo, "/sensors/history", &jsonData);
 
     // Update last sync time
     Firebase.RTDB.setInt(&fbdo, "/device/lastUpdate", millis());
@@ -445,18 +454,18 @@ void createEvent(String eventType)
     if (!Firebase.ready())
         return;
 
-    String eventPath = "/events/" + String(millis());
-
     // Create JSON object with server timestamp
     FirebaseJson eventData;
     eventData.set("type", eventType);
     eventData.set("status", "NORMAL");
     eventData.set("details", "Automatic system response triggered");
     eventData.set("source", DEVICE_ID);
-    // Use Firebase server timestamp instead of device millis()
-    eventData.set("timestamp", Firebase.getServerTime(&fbdo));
+    // Convert to milliseconds for JavaScript compatibility
+    double timestampMs = (double)Firebase.getServerTime(&fbdo) * 1000.0;
+    eventData.set("timestamp", timestampMs);
 
-    Firebase.RTDB.setJSON(&fbdo, eventPath, &eventData);
+    // Push new event with a unique ID to prevent overwriting
+    Firebase.RTDB.pushJSON(&fbdo, "/events", &eventData);
 
     Serial.print("[EVENT] Logged: ");
     Serial.println(eventType);
@@ -468,18 +477,18 @@ void handleFireDetection()
     // Create fire alert event
     if (Firebase.ready())
     {
-        String eventPath = "/events/" + String(millis());
-
         // Create JSON object with server timestamp
         FirebaseJson fireEvent;
         fireEvent.set("type", "FIRE_DETECTED");
         fireEvent.set("status", "ALERT");
         fireEvent.set("details", "Fire detected! Pump activated automatically");
         fireEvent.set("source", DEVICE_ID);
-        // Use Firebase server timestamp
-        fireEvent.set("timestamp", Firebase.getServerTime(&fbdo));
+        // Convert to milliseconds for JavaScript compatibility
+        double timestampMs = (double)Firebase.getServerTime(&fbdo) * 1000.0;
+        fireEvent.set("timestamp", timestampMs);
 
-        Firebase.RTDB.setJSON(&fbdo, eventPath, &fireEvent);
+        // Push new event with a unique ID to prevent overwriting
+        Firebase.RTDB.pushJSON(&fbdo, "/events", &fireEvent);
 
         Serial.println("[FIRE ALERT] Event logged with SERVER TIMESTAMP");
     }
