@@ -16,20 +16,28 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(50)
 
+  // Filter events to only show year 2026 (permanent history)
+  const events2026 = React.useMemo(() => {
+    return events.filter((event) => {
+      const eventDate = new Date(event.timestamp)
+      return eventDate.getFullYear() === 2026
+    })
+  }, [events])
+
   // Log when events are updated (for debugging real-time updates)
   React.useEffect(() => {
-    console.log('[EventLog] 📊 Events updated from Firebase (PATH: events, SAME AS OVERVIEW):', events.length, 'events')
-    if (events.length > 0) {
-      console.log('[EventLog] 🆕 Latest event (from events path):', {
-        type: events[0]?.type,
-        timestamp: events[0]?.timestamp,
-        localTime: new Date(events[0]?.timestamp).toLocaleString(),
-        message: events[0]?.details
+    console.log('[EventLog] 📊 Events from history (PERMANENT):', events.length, 'total, 2026 filtered:', events2026.length)
+    if (events2026.length > 0) {
+      console.log('[EventLog] 🆕 Latest 2026 event:', {
+        type: events2026[0]?.type,
+        timestamp: events2026[0]?.timestamp,
+        localTime: new Date(events2026[0]?.timestamp).toLocaleString(),
+        message: events2026[0]?.details
       })
     } else {
-      console.log('[EventLog] ℹ️ No events available from events path')
+      console.log('[EventLog] ℹ️ No 2026 events available')
     }
-  }, [events])
+  }, [events, events2026])
 
   const eventTypes = ['All', 'FIRE_DETECTED', 'WATER_LEVEL_LOW', 'PUMP_ACTIVATED', 'PUMP_DEACTIVATED']
 
@@ -60,7 +68,7 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
     }
   }
 
-  const filteredEvents = events
+  const filteredEvents = events2026
     // Sort by timestamp descending (newest first)
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
     .filter((event) => {
@@ -96,6 +104,26 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
     const dateFilteredEvents = filterEventsByDateRange(filteredEvents, startDate, endDate)
     const filename = `events_${startDate.toLocaleDateString('en-US')}_to_${endDate.toLocaleDateString('en-US')}.csv`
     exportEventsToCSV(dateFilteredEvents, filename)
+  }
+
+  // Get event description based on event type (with fallback from backend details)
+  const getEventDescription = (event: FirebaseEvent): string => {
+    // If event has details from backend, use it
+    if (event.details && event.details.trim()) {
+      return event.details
+    }
+
+    // Otherwise, generate description based on event type
+    const descriptions: { [key: string]: string } = {
+      'FIRE_DETECTED': 'Fire detected! Pump activated automatically',
+      'FIRE_CLEARED': 'Fire condition cleared and system returned to normal',
+      'WATER_LEVEL_LOW': 'Water level below threshold',
+      'PUMP_ACTIVATED': 'Pump activated automatically',
+      'PUMP_DEACTIVATED': 'Pump stopped after operation completed',
+      'MANUAL_PUMP_TRIGGER': 'Manual pump trigger from dashboard',
+      'RESTART_REQUEST': 'Device restart requested from web dashboard',
+    }
+    return descriptions[event.type] || 'System event occurred'
   }
 
   return (
@@ -187,7 +215,7 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-400 max-w-xs truncate">
-                      {event.details}
+                      {getEventDescription(event)}
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-xs">
                       {event.source}

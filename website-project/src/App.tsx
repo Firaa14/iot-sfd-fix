@@ -18,6 +18,7 @@ import {
   subscribeFireIncidents,
 } from './services/firebase'
 import { useFirebaseListener } from './hooks/useFirebaseListener'
+import { useEventHistory } from './hooks/useEventHistory'
 import { SensorReading, FirebaseEvent, SystemSettings } from './types'
 
 // Main App Component (inside AuthProvider)
@@ -26,6 +27,9 @@ const AppContent: React.FC = () => {
   const [historyDateRange, setHistoryDateRange] = useState<{ start: Date; end: Date } | undefined>()
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [fireIncidentsCount, setFireIncidentsCount] = useState<number>(0)
+
+  // Event history hook for append-only persistence
+  const eventHistory = useEventHistory()
 
   // Firebase listeners
   const { data: sensorData, loading: sensorLoading, error: sensorError } = useFirebaseListener(
@@ -85,6 +89,13 @@ const AppContent: React.FC = () => {
 
     return unsubscribe
   }, [])
+
+  // Merge real-time events into event history (append-only)
+  React.useEffect(() => {
+    if (events && events.length > 0) {
+      eventHistory.mergeEvents(events)
+    }
+  }, [events, eventHistory])
 
   const handleSettingChange = (path: string, value: any) => {
     setSettings(prev => {
@@ -171,7 +182,7 @@ const AppContent: React.FC = () => {
                   />
                   <Route
                     path="/event-log"
-                    element={<EventLog events={events} />}
+                    element={<EventLog events={eventHistory.events} />}
                   />
                   <Route
                     path="/settings"
