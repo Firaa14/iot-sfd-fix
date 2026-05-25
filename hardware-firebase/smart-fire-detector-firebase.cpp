@@ -5,8 +5,8 @@
 #include <time.h>
 
 // ========== WiFi Configuration ==========
-#define WIFI_SSID "FIRDA"
-#define WIFI_PASSWORD "syafira1404"
+#define WIFI_SSID "SEMAYA Lat.2A"
+#define WIFI_PASSWORD "Semaya123"
 
 // ========== Firebase Configuration ==========
 #define FIREBASE_API_KEY "AIzaSyC3H6QR9rX3X1oCxlVWvQXRMXEKMcbYmxY"
@@ -120,25 +120,17 @@ void setup()
     setupWiFi();
     setupFirebase();
 
-    // Set NTP time (UTC+7 for WIB)
-    configTime(25200, 0, "pool.ntp.org", "time.nist.gov");
+    // Set NTP time
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     Serial.println("Waiting for NTP time sync...");
     time_t now = time(nullptr);
-    unsigned long ntpStart = millis();
-    while (now < 24 * 3600 && millis() - ntpStart < 10000)
+    while (now < 24 * 3600)
     {
         delay(500);
         Serial.print(".");
         now = time(nullptr);
     }
-    if (now >= 24 * 3600)
-    {
-        Serial.println("\nTime synced!");
-    }
-    else
-    {
-        Serial.println("\nNTP timeout - will use Firebase server time");
-    }
+    Serial.println("\nTime synced!");
 
     // Update initial device status
     Firebase.RTDB.setString(&fbdo, "/device/lastUpdate", String(millis()));
@@ -370,8 +362,8 @@ void updateSensors()
         currentData.waterVolume = PI * (RADIUS * RADIUS) * water_height;
     }
 
-    // Flame sensor state - use actual sensor reading (debounced)
-    currentData.flameSensorState = (lastConfirmedFlameForEvent == HIGH) ? "DETECTED" : "CLEAR";
+    // Flame sensor state
+    currentData.flameSensorState = (lastPumpState) ? "DETECTED" : "CLEAR";
 
     // Pump state
     currentData.pumpState = lastPumpState ? "ON" : "IDLE";
@@ -410,7 +402,7 @@ float readUltrasonic()
     return (distance > 0) ? distance : -1;
 }
 
-// ========== UPDATE FIREBASE DATA WITH SERVER TIMESTAMP ==========
+// ========== UPDATE FIREBASE DATA ==========
 void updateFirebaseData()
 {
     if (!Firebase.ready())
@@ -422,74 +414,49 @@ void updateFirebaseData()
     // Build JSON path
     String basePath = "/sensors/current";
 
-    // Create JSON object with server timestamp
-    FirebaseJson jsonData;
-    jsonData.set("temperature", currentData.temperature);
-    jsonData.set("humidity", currentData.humidity);
-    jsonData.set("waterLevel", currentData.waterLevel);
-    jsonData.set("waterVolume", currentData.waterVolume);
-    jsonData.set("flameSensor", currentData.flameSensorState);
-    jsonData.set("pumpState", currentData.pumpState);
-    jsonData.set("servoPosition", currentData.servoPosition);
-    // Convert to milliseconds for JavaScript compatibility
-    // Firebase.getServerTime() returns Unix seconds, JS Date() needs milliseconds
-    double timestampMs = (double)Firebase.getServerTime(&fbdo) * 1000.0;
-    jsonData.set("timestamp", timestampMs);
-
-    // Update the entire object at once (more efficient)
-    Firebase.RTDB.setJSON(&fbdo, basePath, &jsonData);
-
-    // Also save to historical data with unique push ID (ensures no data is ever overwritten)
-    Firebase.RTDB.pushJSON(&fbdo, "/sensors/history", &jsonData);
+    // Update individual fields for better performance
+    Firebase.RTDB.setDouble(&fbdo, basePath + "/temperature", currentData.temperature);
+    Firebase.RTDB.setDouble(&fbdo, basePath + "/humidity", currentData.humidity);
+    Firebase.RTDB.setDouble(&fbdo, basePath + "/waterLevel", currentData.waterLevel);
+    Firebase.RTDB.setDouble(&fbdo, basePath + "/waterVolume", currentData.waterVolume);
+    Firebase.RTDB.setString(&fbdo, basePath + "/flameSensor", currentData.flameSensorState);
+    Firebase.RTDB.setString(&fbdo, basePath + "/pumpState", currentData.pumpState);
+    Firebase.RTDB.setInt(&fbdo, basePath + "/servoPosition", currentData.servoPosition);
+    Firebase.RTDB.setInt(&fbdo, basePath + "/timestamp", currentData.timestamp);
 
     // Update last sync time
     Firebase.RTDB.setInt(&fbdo, "/device/lastUpdate", millis());
 
-    Serial.println("[FIREBASE] Data updated to database with SERVER TIMESTAMP");
+    Serial.println("[FIREBASE] Data updated to database");
 }
 
-// ========== EVENT LOGGING WITH SERVER TIMESTAMP ==========
+// ========== EVENT LOGGING ==========
 void createEvent(String eventType)
 {
     if (!Firebase.ready())
         return;
 
-    // Create JSON object with server timestamp
-    FirebaseJson eventData;
-    eventData.set("type", eventType);
-    eventData.set("status", "NORMAL");
-    eventData.set("details", "Automatic system response triggered");
-    eventData.set("source", DEVICE_ID);
-    // Convert to milliseconds for JavaScript compatibility
-    double timestampMs = (double)Firebase.getServerTime(&fbdo) * 1000.0;
-    eventData.set("timestamp", timestampMs);
+    String eventPath = "/events/" + String(millis());
 
-    // Push new event with a unique ID to prevent overwriting
-    Firebase.RTDB.pushJSON(&fbdo, "/events", &eventData);
+    Firebase.RTDB.setString(&fbdo, eventPath + "/type", eventType);
+    Firebase.RTDB.setString(&fbdo, eventPath + "/status", "NORMAL");
+    Firebase.RTDB.setString(&fbdo, eventPath + "/details", "Automatic system response triggered");
+    Firebase.RTDB.setString(&fbdo, eventPath + "/source", DEVICE_ID);
+    Firebase.RTDB.setInt(&fbdo, eventPath + "/timestamp", millis());
 
     Serial.print("[EVENT] Logged: ");
     Serial.println(eventType);
 }
 
-// ========== FIRE DETECTION HANDLER WITH SERVER TIMESTAMP ==========
+// ========== FIRE DETECTION HANDLER ==========
 void handleFireDetection()
 {
     // Create fire alert event
     if (Firebase.ready())
     {
-        // Create JSON object with server timestamp
-        FirebaseJson fireEvent;
-        fireEvent.set("type", "FIRE_DETECTED");
-        fireEvent.set("status", "ALERT");
-        fireEvent.set("details", "Fire detected! Pump activated automatically");
-        fireEvent.set("source", DEVICE_ID);
-        // Convert to milliseconds for JavaScript compatibility
-        double timestampMs = (double)Firebase.getServerTime(&fbdo) * 1000.0;
-        fireEvent.set("timestamp", timestampMs);
-
-        // Push new event with a unique ID to prevent overwriting
-        Firebase.RTDB.pushJSON(&fbdo, "/events", &fireEvent);
-
-        Serial.println("[FIRE ALERT] Event logged with SERVER TIMESTAMP");
+        String eventPath = "/events/" + String(millis());
+        Firebase.RTDB.setString(&fbdo, eventPath + "/type", "FIRE_DETECTED");
+        Firebase.RTDB.setString(&fbdo, eventPath + "/details", "Fire detected! Pump activated automatically");
+        Firebase.RTDB.setString(&fbdo, eventPath + "/source", DEVICE_ID);
     }
 }
