@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react'
-import { Link, useLocation } from 'react-router-dom'
 import { Activity, FileText, Settings, BarChart3, Flame, LogOut, User } from 'lucide-react'
 import clsx from 'clsx'
 import { RealtimeClock } from '../Shared/RealtimeClock'
@@ -10,30 +9,24 @@ interface SidebarLink {
   id: string
   label: string
   icon: React.ReactNode
-  href: string
 }
 
 interface LayoutProps {
   children: React.ReactNode
+  activeTab: string
+  onTabChange: (tabId: string) => void
 }
 
 const SIDEBAR_LINKS: SidebarLink[] = [
-  { id: 'overview', label: 'Overview', icon: <Activity size={20} />, href: '/' },
-  { id: 'live-monitor', label: 'Live Monitor', icon: <BarChart3 size={20} />, href: '/live-monitor' },
-  { id: 'history', label: 'History', icon: <Flame size={20} />, href: '/history' },
-  { id: 'event-log', label: 'Event Log', icon: <FileText size={20} />, href: '/event-log' },
-  { id: 'settings', label: 'Settings', icon: <Settings size={20} />, href: '/settings' },
+  { id: 'overview', label: 'Overview', icon: <Activity size={20} /> },
+  { id: 'live-monitor', label: 'Live Monitor', icon: <BarChart3 size={20} /> },
+  { id: 'history', label: 'History', icon: <Flame size={20} /> },
+  { id: 'event-log', label: 'Event Log', icon: <FileText size={20} /> },
+  { id: 'settings', label: 'Settings', icon: <Settings size={20} /> },
 ]
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const location = useLocation()
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
   const { user, logout } = useAuth()
-
-  const currentPage = useMemo(() => {
-    const path = location.pathname
-    if (path === '/') return 'overview'
-    return path.substring(1) // Remove leading slash
-  }, [location.pathname])
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -41,7 +34,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   }
 
-  // Memoize sidebar links dan logo agar tidak re-render
+  // Memoize sidebar links dan logo agar tidak re-render kecuali activeTab berubah
   const sidebarContent = useMemo(() => (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen overflow-hidden flex-shrink-0">
       {/* Logo Section - NEVER CHANGES */}
@@ -80,19 +73,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Navigation Menu - PERSISTENT */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {SIDEBAR_LINKS.map((link) => (
-          <Link
+          <button
             key={link.id}
-            to={link.href}
+            onClick={() => onTabChange(link.id)}
             className={clsx(
-              'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
-              currentPage === link.id
+              'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left focus:outline-none',
+              activeTab === link.id
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
             )}
           >
             {link.icon}
             <span className="font-medium whitespace-nowrap">{link.label}</span>
-          </Link>
+          </button>
         ))}
       </nav>
 
@@ -109,7 +102,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </div>
     </aside>
-  ), [currentPage, user, logout])
+  ), [activeTab, user, logout, onTabChange])
+
   return (
     <div className="flex h-screen w-screen bg-slate-950 overflow-hidden">
       {/* PERSISTENT SIDEBAR - NEVER MOVES OR RE-RENDERS */}

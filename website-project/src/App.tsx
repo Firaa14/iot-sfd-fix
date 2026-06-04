@@ -21,9 +21,108 @@ import { useFirebaseListener } from './hooks/useFirebaseListener'
 import { useEventHistory } from './hooks/useEventHistory'
 import { SensorReading, FirebaseEvent, SystemSettings } from './types'
 
+interface DashboardContainerProps {
+  activeTab: string
+  onTabChange: (tabId: string) => void
+  sensorData: SensorReading | null
+  deviceInfo: any
+  systemHealth: any
+  events: FirebaseEvent[]
+  isFireDetected: boolean
+  settings: SystemSettings
+  historicalData: any[]
+  fireIncidentsCount: number
+  setHistoryDateRange: React.Dispatch<React.SetStateAction<{ start: Date; end: Date } | undefined>>
+  handleSettingChange: (path: string, value: any) => void
+  eventHistoryEvents: FirebaseEvent[]
+}
+
+const DashboardContainer: React.FC<DashboardContainerProps> = ({
+  activeTab,
+  onTabChange,
+  sensorData,
+  deviceInfo,
+  systemHealth,
+  events,
+  isFireDetected,
+  settings,
+  historicalData,
+  fireIncidentsCount,
+  setHistoryDateRange,
+  handleSettingChange,
+  eventHistoryEvents,
+}) => {
+  // Scroll to top of main content area on tab change
+  React.useEffect(() => {
+    const mainEl = document.querySelector('main')
+    if (mainEl) {
+      mainEl.scrollTop = 0
+    }
+  }, [activeTab])
+
+  // CSS Tab Wrapper - absolute positions inactive tabs off-screen to preserve size metrics for Recharts
+  const getTabClass = (isActive: boolean) =>
+    isActive
+      ? 'w-full h-auto relative opacity-100 transition-opacity duration-150'
+      : 'absolute -left-[9999px] top-0 w-full h-0 pointer-events-none opacity-0 overflow-hidden'
+
+  return (
+    <Layout activeTab={activeTab} onTabChange={onTabChange}>
+      <div className="relative w-full h-full">
+        <div className={getTabClass(activeTab === 'overview')}>
+          <Overview
+            current={sensorData}
+            device={deviceInfo}
+            health={systemHealth}
+            recentEvents={events}
+            isFireDetected={isFireDetected}
+            settings={settings}
+          />
+        </div>
+
+        <div className={getTabClass(activeTab === 'live-monitor')}>
+          <LiveMonitor
+            current={sensorData}
+            isFireDetected={isFireDetected}
+            settings={settings}
+          />
+        </div>
+
+        <div className={getTabClass(activeTab === 'history')}>
+          <History
+            historicalData={historicalData}
+            fireIncidentsCount={fireIncidentsCount}
+            onDateRangeChange={setHistoryDateRange}
+          />
+        </div>
+
+        <div className={getTabClass(activeTab === 'event-log')}>
+          <EventLog events={eventHistoryEvents} />
+        </div>
+
+        <div className={getTabClass(activeTab === 'settings')}>
+          <Settings
+            settings={settings}
+            onSettingChange={handleSettingChange}
+          />
+        </div>
+      </div>
+    </Layout>
+  )
+}
+
 // Main App Component (inside AuthProvider)
 const AppContent: React.FC = () => {
   const { isAuthenticated } = useAuth()
+  const [activeTab, setActiveTab] = useState<string>(
+    () => localStorage.getItem('active_dashboard_tab') || 'overview'
+  )
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId)
+    localStorage.setItem('active_dashboard_tab', tabId)
+  }
+
   const [historyDateRange, setHistoryDateRange] = useState<{ start: Date; end: Date } | undefined>()
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [fireIncidentsCount, setFireIncidentsCount] = useState<number>(0)
@@ -145,58 +244,21 @@ const AppContent: React.FC = () => {
           path="/*"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Routes>
-                  <Route
-                    path="/"
-                    element={
-                      <Overview
-                        current={sensorData}
-                        device={deviceInfo}
-                        health={systemHealth}
-                        recentEvents={events}
-                        isFireDetected={isFireDetected}
-                        settings={settings}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/live-monitor"
-                    element={
-                      <LiveMonitor
-                        current={sensorData}
-                        isFireDetected={isFireDetected}
-                        settings={settings}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/history"
-                    element={
-                      <History
-                        historicalData={historicalData}
-                        fireIncidentsCount={fireIncidentsCount}
-                        onDateRangeChange={setHistoryDateRange}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/event-log"
-                    element={<EventLog events={eventHistory.events} />}
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <Settings
-                        settings={settings}
-                        onSettingChange={handleSettingChange}
-                      />
-                    }
-                  />
-                  {/* Redirect unknown routes to home */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Layout>
+              <DashboardContainer
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                sensorData={sensorData}
+                deviceInfo={deviceInfo}
+                systemHealth={systemHealth}
+                events={events}
+                isFireDetected={isFireDetected}
+                settings={settings}
+                historicalData={historicalData}
+                fireIncidentsCount={fireIncidentsCount}
+                setHistoryDateRange={setHistoryDateRange}
+                handleSettingChange={handleSettingChange}
+                eventHistoryEvents={eventHistory.events}
+              />
             </ProtectedRoute>
           }
         />
