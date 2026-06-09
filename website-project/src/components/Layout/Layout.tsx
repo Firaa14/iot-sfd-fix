@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { RealtimeClock } from '../Shared/RealtimeClock'
 import { FirebaseConnectionMonitor } from '../Shared/FirebaseConnectionMonitor'
 import { useAuth } from '../../auth/AuthContext'
+import { SensorReading } from '../../types'
 
 interface SidebarLink {
   id: string
@@ -15,6 +16,8 @@ interface LayoutProps {
   children: React.ReactNode
   activeTab: string
   onTabChange: (tabId: string) => void
+  sensorData: SensorReading | null
+  deviceInfo?: any
 }
 
 const SIDEBAR_LINKS: SidebarLink[] = [
@@ -25,7 +28,7 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { id: 'settings', label: 'Settings', icon: <Settings size={20} /> },
 ]
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, sensorData, deviceInfo }) => {
   const { user, logout } = useAuth()
 
   const handleLogout = () => {
@@ -34,7 +37,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     }
   }
 
-  // Memoize sidebar links dan logo agar tidak re-render kecuali activeTab berubah
+  // Memoize sidebar links dan logo agar tidak re-render kecuali activeTab berubah atau data sensor berubah
   const sidebarContent = useMemo(() => (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen overflow-hidden flex-shrink-0">
       {/* Logo Section - NEVER CHANGES */}
@@ -92,7 +95,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       {/* Status Section - Real-time Clock & Connection Monitor */}
       <div className="p-4 space-y-3 border-t border-slate-800 flex-shrink-0">
         <RealtimeClock />
-        <FirebaseConnectionMonitor />
+        <FirebaseConnectionMonitor sensorData={sensorData} deviceInfo={deviceInfo} />
 
         {/* Device Info */}
         <div className="p-3 bg-slate-800/50 rounded text-slate-400 text-xs">
@@ -102,7 +105,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       </div>
     </aside>
-  ), [activeTab, user, logout, onTabChange])
+  ), [activeTab, user, logout, onTabChange, sensorData, deviceInfo])
 
   return (
     <div className="flex h-screen w-screen bg-slate-950 overflow-hidden">

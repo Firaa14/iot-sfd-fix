@@ -67,7 +67,12 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
       : 'absolute -left-[9999px] top-0 w-full h-0 pointer-events-none opacity-0 overflow-hidden'
 
   return (
-    <Layout activeTab={activeTab} onTabChange={onTabChange}>
+    <Layout
+      activeTab={activeTab}
+      onTabChange={onTabChange}
+      sensorData={sensorData}
+      deviceInfo={deviceInfo}
+    >
       <div className="relative w-full h-full">
         <div className={getTabClass(activeTab === 'overview')}>
           <Overview
