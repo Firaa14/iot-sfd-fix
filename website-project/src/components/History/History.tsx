@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { StatCard } from '../Shared/Cards'
-import { Thermometer, Droplets, Activity, Flame } from 'lucide-react'
+import { ArrowUp, ArrowDown } from 'lucide-react'
 
 interface HistoryProps {
   historicalData: any[]
@@ -20,7 +20,6 @@ interface HistoryProps {
 
 export const History: React.FC<HistoryProps> = ({
   historicalData,
-  fireIncidentsCount,
   onDateRangeChange
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('24h')
@@ -69,54 +68,92 @@ export const History: React.FC<HistoryProps> = ({
       onDateRangeChange({ start: startDate, end: now })
     }
   }
-  // Process historical data for display
+
+  // Process historical data grouped by hour (no timestamps displayed)
   const chartData = useMemo(() => {
     if (!historicalData || historicalData.length === 0) {
       return []
     }
 
-    // Take latest 24 records for chart display
-    return historicalData.slice(0, 24).map((record) => {
-      const timestamp = typeof record.timestamp === 'string' 
-        ? new Date(record.timestamp).getTime() 
+    // Group by hour
+    const hourlyMap = new Map<string, {
+      temps: number[]
+      humidities: number[]
+      waterLevels: number[]
+      flameValues: number[]
+      timestamp: number
+    }>()
+
+    historicalData.forEach((record) => {
+      const ts = typeof record.timestamp === 'string'
+        ? new Date(record.timestamp).getTime()
         : record.timestamp
-      return {
-        time: new Date(timestamp).toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        temp: record.temperature || 0,
-        humidity: record.humidity || 0,
-        waterLevel: record.waterLevel || 0,
-        timestamp: timestamp,
+      if (!ts) return
+
+      const date = new Date(ts)
+      const hourKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}`
+
+      if (!hourlyMap.has(hourKey)) {
+        hourlyMap.set(hourKey, { temps: [], humidities: [], waterLevels: [], flameValues: [], timestamp: ts })
       }
-    }).reverse() // Reverse to show oldest first for time-series
+
+      const group = hourlyMap.get(hourKey)!
+      if (record.temperature != null) group.temps.push(record.temperature)
+      if (record.humidity != null) group.humidities.push(record.humidity)
+      if (record.waterLevel != null) group.waterLevels.push(record.waterLevel)
+
+      // Flame sensor: DETECTED = 1, CLEAR = 0
+      if (record.flameSensor != null) {
+        group.flameValues.push(record.flameSensor === 'DETECTED' ? 1 : 0)
+      }
+
+      if (ts > group.timestamp) group.timestamp = ts
+    })
+
+    const result = Array.from(hourlyMap.entries()).map(([_key, group]) => {
+      const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+
+      return {
+        label: '',
+        temp: parseFloat(avg(group.temps).toFixed(1)),
+        humidity: parseFloat(avg(group.humidities).toFixed(1)),
+        waterLevel: parseFloat(avg(group.waterLevels).toFixed(1)),
+        flame: parseFloat(avg(group.flameValues).toFixed(2)),
+        sortKey: group.timestamp,
+      }
+    })
+
+    result.sort((a, b) => a.sortKey - b.sortKey)
+    const sliced = result.slice(-24)
+    sliced.forEach((item, index) => { item.label = `${index + 1}` })
+
+    return sliced
   }, [historicalData])
 
-  // Calculate statistics
-  const stats = useMemo(() => {
+  // Calculate Max & Min temperature from real data
+  const tempStats = useMemo(() => {
     if (!historicalData || historicalData.length === 0) {
-      return {
-        avgTemp: 0,
-        avgHumidity: 0,
-        totalRecords: 0,
-        fireIncidents: fireIncidentsCount,
-      }
+      return { maxTemp: 0, minTemp: 0 }
     }
 
-    const temps = historicalData.map((d) => d.temperature || 0)
-    const humidities = historicalData.map((d) => d.humidity || 0)
+    const temps = historicalData
+      .map((d) => d.temperature)
+      .filter((t): t is number => t != null && !isNaN(t))
 
-    const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length
-    const avgHumidity = humidities.reduce((a, b) => a + b, 0) / humidities.length
+    if (temps.length === 0) return { maxTemp: 0, minTemp: 0 }
 
     return {
-      avgTemp: parseFloat(avgTemp.toFixed(1)),
-      avgHumidity: parseFloat(avgHumidity.toFixed(1)),
-      totalRecords: historicalData.length,
-      fireIncidents: fireIncidentsCount,
+      maxTemp: parseFloat(Math.max(...temps).toFixed(1)),
+      minTemp: parseFloat(Math.min(...temps).toFixed(1)),
     }
-  }, [historicalData, fireIncidentsCount])
+  }, [historicalData])
+
+  // Common chart style for tooltip
+  const tooltipStyle = {
+    backgroundColor: '#1e293b',
+    border: '1px solid #475569',
+    borderRadius: '8px',
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -126,35 +163,21 @@ export const History: React.FC<HistoryProps> = ({
         <p className="text-slate-400">Analyze sensor trends and system performance</p>
       </div>
 
-      {/* Historical Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Max & Min Temperature Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard
-          title="Avg Temperature"
-          value={stats.avgTemp}
+          title="Max Temperature"
+          value={tempStats.maxTemp}
           unit="°C"
-          icon={<Thermometer size={24} />}
-          trend={0}
+          icon={<ArrowUp size={24} />}
+          status={tempStats.maxTemp > 35 ? 'danger' : tempStats.maxTemp > 30 ? 'warning' : 'normal'}
         />
         <StatCard
-          title="Avg Humidity"
-          value={stats.avgHumidity}
-          unit="%"
-          icon={<Droplets size={24} />}
-          trend={0}
-        />
-        <StatCard
-          title="Total Records"
-          value={stats.totalRecords}
-          unit="readings"
-          icon={<Activity size={24} />}
-          trend={0}
-        />
-        <StatCard
-          title="Fire Incidents"
-          value={stats.fireIncidents}
-          unit="events"
-          icon={<Flame size={24} />}
-          trend={0}
+          title="Min Temperature"
+          value={tempStats.minTemp}
+          unit="°C"
+          icon={<ArrowDown size={24} />}
+          status={'normal'}
         />
       </div>
 
@@ -175,90 +198,91 @@ export const History: React.FC<HistoryProps> = ({
         ))}
       </div>
 
-      {/* Sensor Time-Series Chart */}
+      {/* Sensor Time-Series — All 3 sensors in one chart */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-white mb-1">Sensor Time-Series</h2>
-          <p className="text-slate-400 text-sm">Temperature, Humidity, and Water Level trends (Real-time from Firebase)</p>
+          <p className="text-slate-400 text-sm">
+            Flame Sensor, DHT22 (Temperature & Humidity), Ultrasonic (Water Level) — {chartData.length} data points
+          </p>
         </div>
 
         {chartData.length === 0 ? (
-          <div className="w-full h-96 flex items-center justify-center">
+          <div className="w-full h-[400px] flex items-center justify-center">
             <p className="text-slate-400">No historical data available yet. Wait for sensor readings to appear...</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis
-              dataKey="time"
-              stroke="#94a3b8"
-              style={{ fontSize: '0.875rem' }}
-            />
-            <YAxis stroke="#94a3b8" style={{ fontSize: '0.875rem' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#1e293b',
-                border: '1px solid #475569',
-                borderRadius: '8px',
-              }}
-              labelStyle={{ color: '#e2e8f0' }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="temp"
-              stroke="#3b82f6"
-              dot={false}
-              strokeWidth={2}
-              name="Temperature (°C)"
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="humidity"
-              stroke="#10b981"
-              dot={false}
-              strokeWidth={2}
-              name="Humidity (%)"
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="waterLevel"
-              stroke="#06b6d4"
-              dot={false}
-              strokeWidth={2}
-              name="Water Level (cm)"
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis
+                dataKey="label"
+                stroke="#94a3b8"
+                style={{ fontSize: '0.875rem' }}
+                tick={false}
+                axisLine={{ stroke: '#334155' }}
+                tickLine={false}
+              />
+              <YAxis stroke="#94a3b8" style={{ fontSize: '0.875rem' }} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelFormatter={() => ''}
+                formatter={(value: number, name: string) => {
+                  if (name === 'Flame Sensor') return [value >= 0.5 ? 'DETECTED' : 'CLEAR', name]
+                  if (name.includes('Temperature')) return [`${value}°C`, name]
+                  if (name.includes('Humidity')) return [`${value}%`, name]
+                  if (name.includes('Water')) return [`${value} cm`, name]
+                  return [`${value}`, name]
+                }}
+              />
+              <Legend />
+              {/* DHT22 — Temperature */}
+              <Line
+                type="monotone"
+                dataKey="temp"
+                stroke="#3b82f6"
+                dot={{ fill: '#3b82f6', r: 3 }}
+                activeDot={{ r: 5 }}
+                strokeWidth={2}
+                name="Temperature (°C)"
+                isAnimationActive={false}
+              />
+              {/* DHT22 — Humidity */}
+              <Line
+                type="monotone"
+                dataKey="humidity"
+                stroke="#10b981"
+                dot={{ fill: '#10b981', r: 3 }}
+                activeDot={{ r: 5 }}
+                strokeWidth={2}
+                name="Humidity (%)"
+                isAnimationActive={false}
+              />
+              {/* Ultrasonic — Water Level */}
+              <Line
+                type="monotone"
+                dataKey="waterLevel"
+                stroke="#06b6d4"
+                dot={{ fill: '#06b6d4', r: 3 }}
+                activeDot={{ r: 5 }}
+                strokeWidth={2}
+                name="Water Level (cm)"
+                isAnimationActive={false}
+              />
+              {/* Flame Sensor */}
+              <Line
+                type="stepAfter"
+                dataKey="flame"
+                stroke="#ef4444"
+                dot={{ fill: '#ef4444', r: 3 }}
+                activeDot={{ r: 5 }}
+                strokeWidth={2}
+                name="Flame Sensor"
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         )}
-      </div>
-
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-          <p className="text-slate-400 text-sm mb-2">Max Temperature</p>
-          <p className="text-2xl font-bold text-white">29.5°C</p>
-          <p className="text-slate-500 text-xs mt-1">16:00 Today</p>
-        </div>
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-          <p className="text-slate-400 text-sm mb-2">Min Temperature</p>
-          <p className="text-2xl font-bold text-white">25.8°C</p>
-          <p className="text-slate-500 text-xs mt-1">04:00 Today</p>
-        </div>
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-          <p className="text-slate-400 text-sm mb-2">Fire Incidents</p>
-          <p className="text-2xl font-bold text-white">0</p>
-          <p className="text-slate-500 text-xs mt-1">Last 24 hours</p>
-        </div>
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-          <p className="text-slate-400 text-sm mb-2">System Uptime</p>
-          <p className="text-2xl font-bold text-white">100%</p>
-          <p className="text-slate-500 text-xs mt-1">No downtime</p>
-        </div>
       </div>
     </div>
   )
