@@ -1,5 +1,5 @@
 import React from 'react'
-import { Thermometer, Droplets, Flame, Activity, AlertTriangle } from 'lucide-react'
+import { Thermometer, Droplets, Flame, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import { SensorReading, SystemSettings } from '../../types'
 import { StatCard, StatusBadge } from '../Shared/Cards'
@@ -97,23 +97,7 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
         <p className="text-slate-400">Real-time sensor readings & system status</p>
       </div>
 
-      {/* Zone Info & System Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className={clsx('border rounded-lg p-6', isFireDetected ? 'bg-red-600/20 border-red-500' : 'bg-slate-800/50 border-slate-700')}>
-          <p className="text-slate-400 text-sm mb-2">MONITORING ZONE</p>
-          <p className="text-3xl font-bold text-white mb-4">Warehouse A</p>
-          <div className="flex items-center gap-2">
-            <div className={clsx('w-3 h-3 rounded-full animate-pulse', isFireDetected ? 'bg-red-500' : 'bg-green-500')} />
-            <span className={isFireDetected ? 'text-red-400' : 'text-green-400'}>{isFireDetected ? 'ALERT - FIRE DETECTED' : 'SAFE - NORMAL'}</span>
-          </div>
-        </div>
 
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-          <p className="text-slate-400 text-sm mb-2">LAST UPDATE</p>
-          <p className="text-2xl font-bold text-white mb-2">{new Date(current.timestamp).toLocaleTimeString()}</p>
-          <p className="text-slate-400 text-xs">Update frekuensi: Real-time (Firebase Listener)</p>
-        </div>
-      </div>
 
       {/* Main Sensor Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -272,30 +256,10 @@ export const LiveMonitor: React.FC<LiveMonitorProps> = ({ current, isFireDetecte
           </div>
         </div>
 
-        {/* Servo Position */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-purple-500/20 rounded-lg text-purple-400">
-              <Activity size={24} />
-            </div>
-            <h3 className="text-lg font-semibold text-white">Servo Position</h3>
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Angle:</span>
-              <span className="font-semibold text-white">{current.servoPosition}°</span>
-            </div>
-            <div className="pt-3 border-t border-slate-700">
-              <p className="text-xs text-slate-500">Range: 0° - 180°</p>
-            </div>
-          </div>
-        </div>
+
       </div>
 
-      {/* Last Update */}
-      <div className="text-right text-slate-400 text-sm">
-        Last update: {new Date(current.timestamp).toLocaleTimeString()}
-      </div>
+
     </div>
   )
 }

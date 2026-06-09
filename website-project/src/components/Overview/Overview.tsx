@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Flame, Droplets, Activity, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import {
@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { SensorReading, SystemSettings } from '../../types'
-import { StatCard, HealthCard } from '../Shared/Cards'
+import { StatCard } from '../Shared/Cards'
 
 interface OverviewProps {
   current: SensorReading | null
@@ -25,31 +25,29 @@ interface OverviewProps {
 
 export const Overview: React.FC<OverviewProps> = ({
   current,
-  device,
-  recentEvents,
   isFireDetected = false,
   settings,
 }) => {
-  // Force re-render when settings change
-  React.useEffect(() => {
-    // This effect ensures the component re-renders when settings change
-  }, [settings])
+  // Accumulate real sensor data for the chart (max 20 data points)
+  const MAX_CHART_POINTS = 20
+  const [chartData, setChartData] = useState<{ time: string; temp: number; humidity: number }[]>([])
+  const lastTimestampRef = useRef<number>(0)
 
-  // Log current sensor data for debugging
-  React.useEffect(() => {
-    if (current) {
-      console.log('[Overview] 📊 Current sensor data from Firebase (PATH: sensors/current):', {
-        temperature: current.temperature,
-        humidity: current.humidity,
-        flameSensor: current.flameSensor,
-        pumpState: current.pumpState,
-        timestamp: current.timestamp,
-        localTime: new Date(current.timestamp).toLocaleString(),
+  useEffect(() => {
+    if (current && current.timestamp !== lastTimestampRef.current) {
+      lastTimestampRef.current = current.timestamp
+      const timeLabel = new Date(current.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      setChartData(prev => {
+        const next = [...prev, { time: timeLabel, temp: current.temperature, humidity: current.humidity }]
+        return next.length > MAX_CHART_POINTS ? next.slice(next.length - MAX_CHART_POINTS) : next
       })
-    } else {
-      console.log('[Overview] ℹ️ No current sensor data available from sensors/current')
     }
   }, [current])
+
+  // Force re-render when settings change
+  useEffect(() => {
+    // This effect ensures the component re-renders when settings change
+  }, [settings])
 
   if (!current) {
     return (
@@ -62,19 +60,6 @@ export const Overview: React.FC<OverviewProps> = ({
       </div>
     )
   }
-
-  // Mock data untuk chart
-  const chartData = [
-    { time: '16:50', temp: 29.0, humidity: 69.2 },
-    { time: '16:51', temp: 29.1, humidity: 69.3 },
-    { time: '16:52', temp: 29.2, humidity: 69.4 },
-    { time: '16:53', temp: 29.1, humidity: 69.5 },
-    { time: '16:54', temp: 28.9, humidity: 69.4 },
-    { time: '16:55', temp: 29.0, humidity: 69.3 },
-    { time: '16:56', temp: 29.1, humidity: 69.2 },
-    { time: '16:57', temp: 29.2, humidity: 69.1 },
-    { time: '16:58', temp: 29.1, humidity: 69.0 },
-  ]
 
   return (
     <div className={clsx('p-6 space-y-6', isFireDetected && 'bg-gradient-to-br from-red-950/30 to-slate-950')}>
@@ -183,64 +168,7 @@ export const Overview: React.FC<OverviewProps> = ({
         </ResponsiveContainer>
       </div>
 
-      {/* System Health & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* System Health */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-6">System Health</h2>
-          <div className="space-y-6">
-            <HealthCard
-              icon={<Activity size={20} />}
-              label="Status"
-              value={device?.online ? 'Device Online' : 'Offline'}
-              status={device?.online ? 'online' : 'offline'}
-            />
-            <HealthCard
-              icon={<Activity size={20} />}
-              label="Uptime"
-              value="12d 4h 32m"
-              status="good"
-            />
-            <HealthCard
-              icon={<Activity size={20} />}
-              label="Signal Strength"
-              value="-65 dBm (Good)"
-              status="good"
-            />
-            <div className="pt-4 border-t border-slate-700">
-              <p className="text-slate-400 text-sm mb-2">FIRMWARE VERSION</p>
-              <p className="font-semibold text-white">{device?.firmwareVersion || 'v2.4.1-stable'}</p>
-            </div>
-          </div>
-        </div>
 
-        {/* Recent Activity */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-6">Recent Activity</h2>
-          <div className="space-y-4 max-h-80 overflow-y-auto">
-            {recentEvents && recentEvents.length > 0 ? (
-              recentEvents.slice(0, 5).map((event, idx) => (
-                <div key={idx} className="flex items-start gap-3 pb-3 border-b border-slate-700/50 last:border-0">
-                  <div className="mt-1">
-                    {event.type === 'FIRE_DETECTED' && <Flame size={16} className="text-red-400" />}
-                    {event.type === 'WATER_LEVEL_LOW' && <Droplets size={16} className="text-yellow-400" />}
-                    {event.type === 'PUMP_ACTIVATED' && <Activity size={16} className="text-blue-400" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white text-sm font-medium">{event.type}</p>
-                    <p className="text-slate-400 text-xs">{event.details}</p>
-                    <p className="text-slate-500 text-xs mt-1">
-                      {new Date(event.timestamp).toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-slate-400 text-sm">No recent events</p>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
