@@ -116,9 +116,9 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   )
 }
 
-// Main App Component (inside AuthProvider)
-const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth()
+// Authenticated App - only mounts when user is authenticated
+// Contains all Firebase hooks and dashboard state
+const AuthenticatedApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>(
     () => localStorage.getItem('active_dashboard_tab') || 'overview'
   )
@@ -217,7 +217,7 @@ const AppContent: React.FC = () => {
     })
   }
 
-  // Show debug info while loading
+  // Show loading while connecting to Firebase
   if (sensorLoading) {
     return (
       <div className="w-screen h-screen bg-slate-950 flex items-center justify-center">
@@ -234,49 +234,59 @@ const AppContent: React.FC = () => {
   const isFireDetected = sensorData?.flameSensor === 'DETECTED'
 
   return (
-    <Router>
-      <Routes>
-        {/* Public route - Login */}
-        <Route
-          path="/login"
-          element={
-            isAuthenticated ? <Navigate to="/" replace /> : <Login />
-          }
-        />
-
-        {/* Protected routes */}
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <DashboardContainer
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-                sensorData={sensorData}
-                deviceInfo={deviceInfo}
-                systemHealth={systemHealth}
-                events={events}
-                isFireDetected={isFireDetected}
-                settings={settings}
-                historicalData={historicalData}
-                fireIncidentsCount={fireIncidentsCount}
-                setHistoryDateRange={setHistoryDateRange}
-                handleSettingChange={handleSettingChange}
-                eventHistoryEvents={eventHistory.events}
-              />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <DashboardContainer
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      sensorData={sensorData}
+      deviceInfo={deviceInfo}
+      systemHealth={systemHealth}
+      events={events}
+      isFireDetected={isFireDetected}
+      settings={settings}
+      historicalData={historicalData}
+      fireIncidentsCount={fireIncidentsCount}
+      setHistoryDateRange={setHistoryDateRange}
+      handleSettingChange={handleSettingChange}
+      eventHistoryEvents={eventHistory.events}
+    />
   )
 }
 
-// Root App Component with AuthProvider
+// AppRoutes - ONLY handles routing based on auth state
+// No Firebase hooks here, so Router stays stable
+const AppRoutes: React.FC = () => {
+  const { isAuthenticated } = useAuth()
+
+  return (
+    <Routes>
+      {/* Public route - Login */}
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? <Navigate to="/" replace /> : <Login />
+        }
+      />
+
+      {/* Protected routes */}
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <AuthenticatedApp />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  )
+}
+
+// Root App Component - Router is at the TOP LEVEL so it never unmounts
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <Router>
+        <AppRoutes />
+      </Router>
     </AuthProvider>
   )
 }

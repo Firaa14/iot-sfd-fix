@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, AlertTriangle, CheckCircle, Flame } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { LoginCredentials } from '../../types'
 
 export const Login: React.FC = () => {
-  const { login, isLoading, error, clearError } = useAuth()
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
@@ -13,6 +15,13 @@ export const Login: React.FC = () => {
   })
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
   const [successMessage, setSuccessMessage] = useState('')
+
+  // Redirect when authentication succeeds
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   // Clear errors when component mounts
   useEffect(() => {
