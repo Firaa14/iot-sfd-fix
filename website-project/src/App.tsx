@@ -82,6 +82,7 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
             recentEvents={events}
             isFireDetected={isFireDetected}
             settings={settings}
+            historicalData={historicalData}
           />
         </div>
 
