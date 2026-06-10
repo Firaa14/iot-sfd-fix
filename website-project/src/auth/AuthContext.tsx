@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react'
 import { AuthUser, AuthState, LoginCredentials } from '../types'
+import { createEvent } from '../services/firebase'
 
 // Auth Actions
 type AuthAction =
@@ -96,6 +97,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.removeItem('auth_user')
             localStorage.removeItem('auth_expiry')
             dispatch({ type: 'SESSION_EXPIRED' })
+            // Log session expired event (fire-and-forget)
+            void createEvent({
+              type: 'SESSION_EXPIRED',
+              status: 'WARNING',
+              details: 'User session expired — automatic logout',
+              source: 'Authentication',
+              timestamp: Date.now(),
+            })
           }
         }
       } catch (error) {
@@ -162,12 +171,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('auth_expiry', expiry.toString())
 
         dispatch({ type: 'LOGIN_SUCCESS', payload: user })
+        // Log login event (fire-and-forget)
+        void createEvent({
+          type: 'USER_LOGIN',
+          status: 'NORMAL',
+          details: `User ${user.name} (${user.email}) logged in successfully`,
+          source: 'Authentication',
+          timestamp: Date.now(),
+        })
       } else {
         throw new Error('Invalid email or password')
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed'
       dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage })
+      // Log failed login event (fire-and-forget)
+      void createEvent({
+        type: 'FAILED_LOGIN',
+        status: 'ALERT',
+        details: `Failed login attempt for: ${credentials.email}`,
+        source: 'Authentication',
+        timestamp: Date.now(),
+      })
     }
   }
 
@@ -176,6 +201,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('auth_token')
     localStorage.removeItem('auth_user')
     localStorage.removeItem('auth_expiry')
+    // Log logout event (fire-and-forget)
+    void createEvent({
+      type: 'USER_LOGOUT',
+      status: 'NORMAL',
+      details: 'User logged out from the system',
+      source: 'Authentication',
+      timestamp: Date.now(),
+    })
     dispatch({ type: 'LOGOUT' })
   }
 

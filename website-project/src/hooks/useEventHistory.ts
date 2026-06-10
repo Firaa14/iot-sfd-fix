@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { FirebaseEvent } from '../types'
 
 const STORAGE_KEY = 'event_log_history_2026'
+const MAX_EVENTS = 2000
 
 export const useEventHistory = () => {
   const [events, setEvents] = useState<FirebaseEvent[]>([])
@@ -39,17 +40,17 @@ export const useEventHistory = () => {
       }
 
       // Check if event already exists by composite key (timestamp + type + source)
-      if (prev.some(e => e.timestamp === event.timestamp && e.type === event.type)) {
+      if (prev.some(e => e.timestamp === event.timestamp && e.type === event.type && e.source === event.source)) {
         return prev
       }
 
-      // Add new event (keep max 1000 events to prevent localStorage overflow)
-      const updated = [event, ...prev].slice(0, 1000)
+      // Add new event (keep max events to prevent localStorage overflow)
+      const updated = [event, ...prev].slice(0, MAX_EVENTS)
       return updated
     })
   }, [])
 
-  // Merge multiple events (batch add)
+  // Merge multiple events (batch add from Firebase)
   const mergeEvents = useCallback((newEvents: FirebaseEvent[]) => {
     setEvents(prev => {
       let merged = [...prev]
@@ -58,15 +59,15 @@ export const useEventHistory = () => {
       for (const newEvent of newEvents) {
         const exists =
           merged.some(e => e.id && e.id === newEvent.id) ||
-          merged.some(e => e.timestamp === newEvent.timestamp && e.type === newEvent.type)
+          merged.some(e => e.timestamp === newEvent.timestamp && e.type === newEvent.type && e.source === newEvent.source)
 
         if (!exists) {
           merged.unshift(newEvent)
         }
       }
 
-      // Keep max 1000 events
-      return merged.slice(0, 1000)
+      // Keep max events
+      return merged.slice(0, MAX_EVENTS)
     })
   }, [])
 

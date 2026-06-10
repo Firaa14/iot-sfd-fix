@@ -1,28 +1,45 @@
 import { FirebaseEvent } from '../types'
 
+/**
+ * Export events to CSV — exports whatever events are passed in (already filtered).
+ * CSV format: Timestamp, Event Type, Source, Description, Status
+ * Timestamp uses ISO-like format: YYYY-MM-DD HH:MM:SS (Excel-friendly)
+ */
 export const exportEventsToCSV = (events: FirebaseEvent[], filename: string = 'events.csv') => {
   if (events.length === 0) {
     alert('Tidak ada data untuk diekspor!')
     return
   }
 
-  // Define headers
-  const headers = ['Timestamp', 'Event Type', 'Status', 'Details', 'Source']
+  // Format timestamp as YYYY-MM-DD HH:MM:SS (Excel-friendly)
+  const formatTimestamp = (ts: number): string => {
+    const d = new Date(ts)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
+
+  // Define headers — matches the requested CSV columns
+  const headers = ['Timestamp', 'Event Type', 'Source', 'Description', 'Status']
 
   // Convert events to CSV rows
   const rows = events.map((event) => [
-    new Date(event.timestamp).toLocaleString('id-ID'),
+    formatTimestamp(event.timestamp),
     event.type,
+    event.source || 'System',
+    event.details || '',
     event.status,
-    event.details,
-    event.source,
   ])
 
-  // Combine headers and rows
-  const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n')
+  // Combine headers and rows — escape double quotes inside cells
+  const csv = [headers, ...rows]
+    .map((row) =>
+      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    )
+    .join('\n')
 
-  // Create blob and download
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  // Add BOM for Excel UTF-8 compatibility
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
 

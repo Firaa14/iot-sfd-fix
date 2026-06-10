@@ -16,6 +16,7 @@ import {
   subscribeEvents,
   subscribeHistoricalData,
   subscribeFireIncidents,
+  createEvent,
 } from './services/firebase'
 import { useFirebaseListener } from './hooks/useFirebaseListener'
 import { useEventHistory } from './hooks/useEventHistory'
@@ -201,6 +202,125 @@ const AuthenticatedApp: React.FC = () => {
       eventHistory.mergeEvents(events)
     }
   }, [events, eventHistory])
+
+  // Track previous sensor state for change detection
+  const prevSensorRef = React.useRef<SensorReading | null>(null)
+
+  // Detect sensor state changes and log events to Firebase automatically
+  React.useEffect(() => {
+    if (!sensorData) return
+
+    const prev = prevSensorRef.current
+
+    if (prev !== null) {
+      // Flame sensor change
+      if (prev.flameSensor !== sensorData.flameSensor) {
+        if (sensorData.flameSensor === 'DETECTED') {
+          void createEvent({
+            type: 'FIRE_DETECTED',
+            status: 'ALERT',
+            details: 'Flame sensor detected fire — automatic response activated',
+            source: 'Flame Sensor',
+            timestamp: Date.now(),
+          })
+        } else {
+          void createEvent({
+            type: 'FIRE_CLEARED',
+            status: 'NORMAL',
+            details: 'Flame sensor returned to normal — fire condition cleared',
+            source: 'Flame Sensor',
+            timestamp: Date.now(),
+          })
+        }
+      }
+
+      // Pump state change
+      if (prev.pumpState !== sensorData.pumpState) {
+        if (sensorData.pumpState === 'ON') {
+          void createEvent({
+            type: 'PUMP_ACTIVATED',
+            status: 'NORMAL',
+            details: 'Water pump activated automatically',
+            source: 'Pump System',
+            timestamp: Date.now(),
+          })
+        } else {
+          void createEvent({
+            type: 'PUMP_DEACTIVATED',
+            status: 'NORMAL',
+            details: 'Water pump deactivated — operation completed',
+            source: 'Pump System',
+            timestamp: Date.now(),
+          })
+        }
+      }
+
+      // Water level threshold crossing
+      if (prev.waterLevel !== undefined && sensorData.waterLevel !== undefined) {
+        const prevAlert = prev.waterLevel > 6
+        const currAlert = sensorData.waterLevel > 6
+        if (!prevAlert && currAlert) {
+          void createEvent({
+            type: 'WATER_LEVEL_LOW',
+            status: 'WARNING',
+            details: `Water level alert: ${sensorData.waterLevel.toFixed(1)} cm`,
+            source: 'Ultrasonic Sensor',
+            timestamp: Date.now(),
+          })
+        } else if (prevAlert && !currAlert) {
+          void createEvent({
+            type: 'WATER_LEVEL_NORMAL',
+            status: 'NORMAL',
+            details: `Water level normalized: ${sensorData.waterLevel.toFixed(1)} cm`,
+            source: 'Ultrasonic Sensor',
+            timestamp: Date.now(),
+          })
+        }
+      }
+
+      // Temperature change (≥1°C)
+      if (prev.temperature !== undefined && sensorData.temperature !== undefined) {
+        if (Math.abs(prev.temperature - sensorData.temperature) >= 1) {
+          void createEvent({
+            type: 'TEMPERATURE_CHANGED',
+            status: 'NORMAL',
+            details: `Temperature changed: ${prev.temperature}°C → ${sensorData.temperature}°C`,
+            source: 'Temperature Sensor',
+            timestamp: Date.now(),
+          })
+        }
+      }
+
+      // Humidity change (≥1%)
+      if (prev.humidity !== undefined && sensorData.humidity !== undefined) {
+        if (Math.abs(prev.humidity - sensorData.humidity) >= 1) {
+          void createEvent({
+            type: 'HUMIDITY_CHANGED',
+            status: 'NORMAL',
+            details: `Humidity changed: ${prev.humidity}% → ${sensorData.humidity}%`,
+            source: 'Humidity Sensor',
+            timestamp: Date.now(),
+          })
+        }
+      }
+
+      // Servo position change
+      if (prev.servoPosition !== undefined && sensorData.servoPosition !== undefined) {
+        if (prev.servoPosition !== sensorData.servoPosition) {
+          const isOpen = sensorData.servoPosition > 0
+          void createEvent({
+            type: isOpen ? 'SERVO_OPEN' : 'SERVO_CLOSED',
+            status: 'NORMAL',
+            details: `Servo position changed: ${prev.servoPosition}° → ${sensorData.servoPosition}°`,
+            source: 'Servo Controller',
+            timestamp: Date.now(),
+          })
+        }
+      }
+    }
+
+    prevSensorRef.current = sensorData
+  }, [sensorData])
 
   const handleSettingChange = (path: string, value: any) => {
     setSettings(prev => {

@@ -1,55 +1,90 @@
 import React, { useState } from 'react'
-import { Flame, AlertCircle, Zap, Clock, Search, Download } from 'lucide-react'
+import {
+  Flame,
+  AlertCircle,
+  Zap,
+  Clock,
+  Search,
+  Download,
+  Shield,
+  Activity,
+  Thermometer,
+  Droplets,
+  Server,
+} from 'lucide-react'
 import clsx from 'clsx'
 import { FirebaseEvent } from '../../types'
-import { DateRangePicker } from '../DateRangePicker/DateRangePicker'
-import { exportEventsToCSV, filterEventsByDateRange } from '../../utils/csvExport'
+import { exportEventsToCSV } from '../../utils/csvExport'
 
 interface EventLogProps {
   events: FirebaseEvent[]
 }
 
+const formatEventTimestamp = (timestamp: number): string => {
+  const d = new Date(timestamp)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = months[d.getMonth()]
+  const year = d.getFullYear()
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const seconds = String(d.getSeconds()).padStart(2, '0')
+  return `${day} ${month} ${year}, ${hours}:${minutes}:${seconds}`
+}
+
 export const EventLog: React.FC<EventLogProps> = ({ events }) => {
-  const [filter, setFilter] = useState('All')
+  // ✅ Default filter langsung ke kategori pertama, tidak ada 'ALL'
+  const [filter, setFilter] = useState('FIRE_DETECTED')
   const [searchTerm, setSearchTerm] = useState('')
-  const [showDateRangePicker, setShowDateRangePicker] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(50)
 
-  // Filter events to only show year 2026 (permanent history)
-  const events2026 = React.useMemo(() => {
-    return events.filter((event) => {
-      const eventDate = new Date(event.timestamp)
-      return eventDate.getFullYear() === 2026
-    })
-  }, [events])
-
-  // Log when events are updated (for debugging real-time updates)
-  React.useEffect(() => {
-    console.log('[EventLog] 📊 Events from history (PERMANENT):', events.length, 'total, 2026 filtered:', events2026.length)
-    if (events2026.length > 0) {
-      console.log('[EventLog] 🆕 Latest 2026 event:', {
-        type: events2026[0]?.type,
-        timestamp: events2026[0]?.timestamp,
-        localTime: new Date(events2026[0]?.timestamp).toLocaleString(),
-        message: events2026[0]?.details
-      })
-    } else {
-      console.log('[EventLog] ℹ️ No 2026 events available')
-    }
-  }, [events, events2026])
-
-  const eventTypes = ['All', 'FIRE_DETECTED', 'WATER_LEVEL_LOW', 'PUMP_ACTIVATED', 'PUMP_DEACTIVATED']
+  // ✅ Tidak ada 'ALL'
+  const eventTypes = [
+    'FIRE_DETECTED',
+    'FIRE_CLEARED',
+    'WATER_LEVEL_LOW',
+    'PUMP_ACTIVATED',
+    'PUMP_DEACTIVATED',
+  ]
 
   const getEventIcon = (type: string) => {
     switch (type) {
       case 'FIRE_DETECTED':
+      case 'FIRE_CLEARED':
+      case 'FIRE_ALERT_TRIGGERED':
+      case 'FLAME_SENSOR_DETECTED':
+      case 'FLAME_SENSOR_NORMAL':
         return <Flame size={16} className="text-red-400" />
       case 'WATER_LEVEL_LOW':
-        return <AlertCircle size={16} className="text-yellow-400" />
+      case 'WATER_LEVEL_NORMAL':
+      case 'WATER_LEVEL_CHANGED':
+        return <Droplets size={16} className="text-blue-400" />
       case 'PUMP_ACTIVATED':
       case 'PUMP_DEACTIVATED':
+      case 'MANUAL_PUMP_TRIGGER':
         return <Zap size={16} className="text-blue-400" />
+      case 'ALARM_ACTIVATED':
+      case 'ALARM_DEACTIVATED':
+      case 'SERVO_OPEN':
+      case 'SERVO_CLOSED':
+        return <AlertCircle size={16} className="text-orange-400" />
+      case 'TEMPERATURE_CHANGED':
+        return <Thermometer size={16} className="text-yellow-400" />
+      case 'HUMIDITY_CHANGED':
+        return <Activity size={16} className="text-cyan-400" />
+      case 'USER_LOGIN':
+      case 'USER_LOGOUT':
+      case 'SESSION_EXPIRED':
+      case 'FAILED_LOGIN':
+        return <Shield size={16} className="text-purple-400" />
+      case 'DEVICE_CONNECTED':
+      case 'DEVICE_DISCONNECTED':
+      case 'SYSTEM_STARTED':
+      case 'DATABASE_CONNECTED':
+      case 'DATABASE_ERROR':
+      case 'RESTART_REQUEST':
+        return <Server size={16} className="text-slate-400" />
       default:
         return <Clock size={16} className="text-slate-400" />
     }
@@ -68,82 +103,100 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
     }
   }
 
-  const filteredEvents = events2026
-    // Sort by timestamp descending (newest first)
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-    .filter((event) => {
-      const matchesFilter = filter === 'All' || event.type === filter
+  const sortedEvents = React.useMemo(() => {
+    return [...events].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+  }, [events])
+
+  const filteredEvents = React.useMemo(() => {
+    return sortedEvents.filter((event) => {
+      // ✅ Tidak ada kondisi 'ALL' — filter selalu eksak
+      const matchesFilter = event.type === filter
+
+      const tsStr = formatEventTimestamp(event.timestamp)
+      const search = searchTerm.toLowerCase()
       const matchesSearch =
-        event.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.details.toLowerCase().includes(searchTerm.toLowerCase())
+        !searchTerm ||
+        event.type.toLowerCase().includes(search) ||
+        (event.details || '').toLowerCase().includes(search) ||
+        (event.source || '').toLowerCase().includes(search) ||
+        tsStr.toLowerCase().includes(search)
+
       return matchesFilter && matchesSearch
     })
+  }, [sortedEvents, filter, searchTerm])
 
-  // Pagination logic
   const totalEvents = filteredEvents.length
-  const totalPages = Math.ceil(totalEvents / rowsPerPage)
+  const totalPages = Math.ceil(totalEvents / rowsPerPage) || 1
   const startIndex = (currentPage - 1) * rowsPerPage
   const endIndex = startIndex + rowsPerPage
   const paginatedEvents = filteredEvents.slice(startIndex, endIndex)
 
-  // Reset to first page when filter changes
   React.useEffect(() => {
     setCurrentPage(1)
   }, [filter, searchTerm])
 
   const handleRowsPerPageChange = (newRowsPerPage: number) => {
     setRowsPerPage(newRowsPerPage)
-    setCurrentPage(1) // Reset to first page
+    setCurrentPage(1)
   }
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
 
-  const handleExportCSV = (startDate: Date, endDate: Date) => {
-    const dateFilteredEvents = filterEventsByDateRange(filteredEvents, startDate, endDate)
-    const filename = `events_${startDate.toLocaleDateString('en-US')}_to_${endDate.toLocaleDateString('en-US')}.csv`
-    exportEventsToCSV(dateFilteredEvents, filename)
+  const handleExportCSV = () => {
+    if (filteredEvents.length === 0) {
+      alert('Tidak ada data untuk diekspor!')
+      return
+    }
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const filename = `events_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.csv`
+    exportEventsToCSV(filteredEvents, filename)
   }
 
-  // Get event description based on event type (with fallback from backend details)
   const getEventDescription = (event: FirebaseEvent): string => {
-    // If event has details from backend, use it
     if (event.details && event.details.trim()) {
       return event.details
     }
-
-    // Otherwise, generate description based on event type
     const descriptions: { [key: string]: string } = {
-      'FIRE_DETECTED': 'Fire detected! Pump activated automatically',
-      'FIRE_CLEARED': 'Fire condition cleared and system returned to normal',
-      'WATER_LEVEL_LOW': 'Water level below threshold',
-      'PUMP_ACTIVATED': 'Pump activated automatically',
-      'PUMP_DEACTIVATED': 'Pump stopped after operation completed',
-      'MANUAL_PUMP_TRIGGER': 'Manual pump trigger from dashboard',
-      'RESTART_REQUEST': 'Device restart requested from web dashboard',
+      FIRE_DETECTED: 'Fire detected — pump activated automatically',
+      FIRE_CLEARED: 'Fire condition cleared, system returned to normal',
+      FLAME_SENSOR_DETECTED: 'Flame sensor detected fire presence',
+      FLAME_SENSOR_NORMAL: 'Flame sensor returned to normal state',
+      WATER_LEVEL_LOW: 'Water level below threshold',
+      WATER_LEVEL_NORMAL: 'Water level returned to normal range',
+      PUMP_ACTIVATED: 'Water pump activated',
+      PUMP_DEACTIVATED: 'Water pump deactivated',
+      MANUAL_PUMP_TRIGGER: 'Manual pump trigger from dashboard',
+      TEMPERATURE_CHANGED: 'Temperature reading changed',
+      HUMIDITY_CHANGED: 'Humidity reading changed',
+      SERVO_OPEN: 'Servo valve opened',
+      SERVO_CLOSED: 'Servo valve closed',
+      ALARM_ACTIVATED: 'Alarm system activated',
+      ALARM_DEACTIVATED: 'Alarm system deactivated',
+      USER_LOGIN: 'User logged in to the system',
+      USER_LOGOUT: 'User logged out from the system',
+      SESSION_EXPIRED: 'User session expired — automatic logout',
+      FAILED_LOGIN: 'Failed login attempt',
+      DEVICE_CONNECTED: 'IoT device connected to system',
+      DEVICE_DISCONNECTED: 'IoT device disconnected from system',
+      SYSTEM_STARTED: 'System started successfully',
+      RESTART_REQUEST: 'Device restart requested from dashboard',
+      DATABASE_CONNECTED: 'Database connection established',
+      DATABASE_ERROR: 'Database connection error occurred',
     }
     return descriptions[event.type] || 'System event occurred'
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Date Range Picker Modal */}
-      <DateRangePicker
-        isOpen={showDateRangePicker}
-        onClose={() => setShowDateRangePicker(false)}
-        onConfirm={handleExportCSV}
-      />
-
-      {/* Page Title */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Event Log</h1>
         <p className="text-slate-400">Detailed record of all system activities</p>
       </div>
 
-      {/* Controls */}
       <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-        {/* Search */}
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-3 text-slate-400" />
           <input
@@ -155,9 +208,8 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
           />
         </div>
 
-        {/* Export */}
         <button
-          onClick={() => setShowDateRangePicker(true)}
+          onClick={handleExportCSV}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 border border-green-500 rounded-lg text-white hover:bg-green-700 transition-colors font-medium"
         >
           <Download size={16} />
@@ -165,14 +217,14 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
         </button>
       </div>
 
-      {/* Filter Tabs */}
+      {/* ✅ Filter Tabs — 5 kategori, tanpa ALL */}
       <div className="flex gap-2 flex-wrap">
         {eventTypes.map((type) => (
           <button
             key={type}
             onClick={() => setFilter(type)}
             className={clsx(
-              'px-4 py-2 rounded-lg transition-colors',
+              'px-4 py-2 rounded-lg transition-colors text-sm',
               filter === type
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-600'
@@ -183,7 +235,6 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
         ))}
       </div>
 
-      {/* Events Table */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -199,9 +250,12 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
             <tbody>
               {paginatedEvents.length > 0 ? (
                 paginatedEvents.map((event, idx) => (
-                  <tr key={`${event.id}-${idx}`} className="border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 text-slate-300">
-                      {new Date(event.timestamp).toLocaleString()}
+                  <tr
+                    key={`${event.id}-${idx}`}
+                    className="border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-slate-300 whitespace-nowrap font-mono text-xs">
+                      {formatEventTimestamp(event.timestamp)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -210,16 +264,19 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={clsx('px-3 py-1 rounded-full text-xs font-medium border', getStatusColor(event.status))}>
+                      <span
+                        className={clsx(
+                          'px-3 py-1 rounded-full text-xs font-medium border',
+                          getStatusColor(event.status)
+                        )}
+                      >
                         {event.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-400 max-w-xs truncate">
                       {getEventDescription(event)}
                     </td>
-                    <td className="px-6 py-4 text-slate-400 text-xs">
-                      {event.source}
-                    </td>
+                    <td className="px-6 py-4 text-slate-400 text-xs">{event.source}</td>
                   </tr>
                 ))
               ) : (
@@ -233,10 +290,8 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
           </table>
         </div>
 
-        {/* Pagination Controls */}
         {totalEvents > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-700 bg-slate-900/50">
-            {/* Rows per page selector */}
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <span>Rows per page:</span>
               <select
@@ -250,18 +305,10 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
               </select>
             </div>
 
-            {/* Page info */}
             <div className="text-sm text-slate-400">
-              {totalEvents > 0 ? (
-                <>
-                  {startIndex + 1}-{Math.min(endIndex, totalEvents)} of {totalEvents} events
-                </>
-              ) : (
-                'No events'
-              )}
+              {startIndex + 1}–{Math.min(endIndex, totalEvents)} of {totalEvents} events
             </div>
 
-            {/* Page navigation */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
@@ -271,7 +318,6 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
                 Previous
               </button>
 
-              {/* Page numbers */}
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
@@ -305,7 +351,6 @@ export const EventLog: React.FC<EventLogProps> = ({ events }) => {
         )}
       </div>
 
-      {/* Footer Info */}
       <div className="text-sm text-slate-400">
         Showing {filteredEvents.length} of {events.length} events
       </div>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -18,12 +18,41 @@ interface HistoryProps {
   onDateRangeChange?: (dateRange: { start: Date; end: Date } | undefined) => void
 }
 
+// Generate realistic dummy sensor data for display when no real data is available
+function generateDummyData() {
+  const data = []
+  for (let i = 0; i < 24; i++) {
+    // Temperature: simulate day/night cycle (cooler at night, warmer at midday)
+    const hourFactor = Math.sin(((i - 6) / 24) * Math.PI * 2) // peaks around hour 12
+    const baseTemp = 29.5 + hourFactor * 4.5 // range ~25°C to ~34°C
+    const temp = parseFloat((baseTemp + (Math.random() - 0.5) * 1.5).toFixed(1))
+
+    // Humidity: inversely related to temperature with some noise
+    const baseHumidity = 66 - hourFactor * 11 // higher when cooler
+    const humidity = parseFloat((baseHumidity + (Math.random() - 0.5) * 5).toFixed(1))
+
+    // Water level: slow drift with minor fluctuations
+    const baseWater = 13 + Math.sin((i / 24) * Math.PI) * 5
+    const waterLevel = parseFloat((baseWater + (Math.random() - 0.5) * 2).toFixed(1))
+
+    // Flame sensor: mostly clear, occasional detection
+    const flame = (i === 8 || i === 17) ? 1 : 0
+
+    data.push({
+      label: `${i + 1}`,
+      temp,
+      humidity,
+      waterLevel,
+      flame,
+      sortKey: i,
+    })
+  }
+  return data
+}
+
 export const History: React.FC<HistoryProps> = ({
   historicalData,
-  onDateRangeChange
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState('24h')
-
   // Log when historical data is updated (for debugging real-time updates)
   React.useEffect(() => {
     console.log('[History] 📊 Historical data updated from Firebase (SAME PATH AS OVERVIEW: sensors/current):', historicalData.length, 'records')
@@ -36,44 +65,21 @@ export const History: React.FC<HistoryProps> = ({
         localTime: historicalData[0]?.localTime,
       })
     } else {
-      console.log('[History] ℹ️ No historical data available from sensors/current')
+      console.log('[History] ℹ️ No historical data available — using dummy data')
     }
   }, [historicalData])
 
-  // Handle period selection and date range filtering
-  const handlePeriodChange = (period: string) => {
-    setSelectedPeriod(period)
-
-    if (onDateRangeChange) {
-      const now = new Date()
-      let startDate: Date
-
-      switch (period) {
-        case '24h':
-          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-          break
-        case '7d':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          break
-        case '30d':
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          break
-        case '90d':
-          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          break
-        default:
-          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      }
-
-      onDateRangeChange({ start: startDate, end: now })
-    }
-  }
-
   // Process historical data grouped by hour (no timestamps displayed)
+  // Falls back to dummy data when no real historical data is available
   const chartData = useMemo(() => {
     if (!historicalData || historicalData.length === 0) {
-      return []
+      // No real data available — use realistic dummy data as fallback
+      console.log('[History] 📈 Using dummy data for chart display')
+      return generateDummyData()
     }
+
+    // Real data is available — use it (priority always given to real data)
+    console.log('[History] ✅ Using real sensor data for chart display')
 
     // Group by hour
     const hourlyMap = new Map<string, {
@@ -130,23 +136,34 @@ export const History: React.FC<HistoryProps> = ({
     return sliced
   }, [historicalData])
 
-  // Calculate Max & Min temperature from real data
+  // Calculate Max & Min temperature from real data, fallback to dummy chart data
   const tempStats = useMemo(() => {
-    if (!historicalData || historicalData.length === 0) {
-      return { maxTemp: 0, minTemp: 0 }
+    if (historicalData && historicalData.length > 0) {
+      const temps = historicalData
+        .map((d) => d.temperature)
+        .filter((t): t is number => t != null && !isNaN(t))
+
+      if (temps.length > 0) {
+        return {
+          maxTemp: parseFloat(Math.max(...temps).toFixed(1)),
+          minTemp: parseFloat(Math.min(...temps).toFixed(1)),
+        }
+      }
     }
 
-    const temps = historicalData
-      .map((d) => d.temperature)
-      .filter((t): t is number => t != null && !isNaN(t))
-
-    if (temps.length === 0) return { maxTemp: 0, minTemp: 0 }
-
-    return {
-      maxTemp: parseFloat(Math.max(...temps).toFixed(1)),
-      minTemp: parseFloat(Math.min(...temps).toFixed(1)),
+    // Fallback: derive from chart data (which may be dummy data)
+    if (chartData.length > 0) {
+      const temps = chartData.map((d) => d.temp).filter((t) => t != null && !isNaN(t))
+      if (temps.length > 0) {
+        return {
+          maxTemp: parseFloat(Math.max(...temps).toFixed(1)),
+          minTemp: parseFloat(Math.min(...temps).toFixed(1)),
+        }
+      }
     }
-  }, [historicalData])
+
+    return { maxTemp: 0, minTemp: 0 }
+  }, [historicalData, chartData])
 
   // Common chart style for tooltip
   const tooltipStyle = {
@@ -181,35 +198,21 @@ export const History: React.FC<HistoryProps> = ({
         />
       </div>
 
-      {/* Time Period Selector */}
-      <div className="flex gap-2">
-        {['24h', '7d', '30d', '90d'].map((period) => (
-          <button
-            key={period}
-            onClick={() => handlePeriodChange(period)}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              selectedPeriod === period
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-600'
-            }`}
-          >
-            {period}
-          </button>
-        ))}
-      </div>
-
       {/* Sensor Time-Series — All 3 sensors in one chart */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-white mb-1">Sensor Time-Series</h2>
           <p className="text-slate-400 text-sm">
             Flame Sensor, DHT22 (Temperature & Humidity), Ultrasonic (Water Level) — {chartData.length} data points
+            {(!historicalData || historicalData.length === 0) && (
+              <span className="ml-2 text-amber-400/70 text-xs">(Dummy data — waiting for real sensor readings)</span>
+            )}
           </p>
         </div>
 
         {chartData.length === 0 ? (
           <div className="w-full h-[400px] flex items-center justify-center">
-            <p className="text-slate-400">No historical data available yet. Wait for sensor readings to appear...</p>
+            <p className="text-slate-400">Loading sensor data...</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
